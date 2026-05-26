@@ -35,13 +35,10 @@ function processform($aFormValues){
 		$fm								= trim($aFormValues['fm']);
 		$auto_seq						= trim($aFormValues['auto_seq']);
 		$memberID						= trim($aFormValues['memberID']);
-		$scheduled_entry_date			= trim($aFormValues['scheduled_entry_date']);
-		$actual_entry_date				= trim($aFormValues['actual_entry_date']);
-		$construction_days_first_floor	= trim($aFormValues['construction_days_first_floor']);
-		$construction_days_per_floor	= trim($aFormValues['construction_days_per_floor']);
-		$std_layer_floor				= trim($aFormValues['std_layer_floor']);
-		$roof_protrusion_floor			= trim($aFormValues['roof_protrusion_floor']);
-		$outsourcing					= trim($aFormValues['outsourcing']);
+		$std_layer_qty					= trim($aFormValues['std_layer_qty']);
+		$roof_protrusion_qty			= trim($aFormValues['roof_protrusion_qty']);
+		$layout_std_layer_qty			= trim($aFormValues['layout_std_layer_qty']);
+		$layout_roof_protrusion_qty		= trim($aFormValues['layout_roof_protrusion_qty']);
 
 		
 		//存入實體資料庫中
@@ -49,13 +46,10 @@ function processform($aFormValues){
 		$mDB = new MywebDB();
 	  
 		$Qry="UPDATE buildings_sub set
-				 scheduled_entry_date	= '$scheduled_entry_date'
-				,actual_entry_date	= '$actual_entry_date'
-				,construction_days_first_floor	= '$construction_days_first_floor'
-				,construction_days_per_floor	= '$construction_days_per_floor'
-				,std_layer_floor	= '$std_layer_floor'
-				,roof_protrusion_floor	= '$roof_protrusion_floor'
-				,outsourcing	= '$outsourcing'
+				 std_layer_qty	= '$std_layer_qty'
+				,roof_protrusion_qty	= '$roof_protrusion_qty'
+				,layout_std_layer_qty	= '$layout_std_layer_qty'
+				,layout_roof_protrusion_qty	= '$layout_roof_protrusion_qty'
 				,makeby	= '$memberID'
 				,last_modify	= now()
 				where auto_seq = '$auto_seq'";
@@ -119,7 +113,11 @@ if ($mDB->rowCount() > 0) {
 	$construction_days_first_floor = $row['construction_days_first_floor'];
 	$construction_days_per_floor = $row['construction_days_per_floor'];
 	$std_layer_floor = $row['std_layer_floor'];
+	$std_layer_qty = $row['std_layer_qty'];
 	$roof_protrusion_floor = $row['roof_protrusion_floor'];
+	$roof_protrusion_qty = $row['roof_protrusion_qty'];
+	$layout_std_layer_qty = $row['layout_std_layer_qty'];
+	$layout_roof_protrusion_qty = $row['layout_roof_protrusion_qty'];
 	$outsourcing = $row['outsourcing'];
 }
 
@@ -228,67 +226,67 @@ $style_css
 					<div>
 						<div class="field_div1">本棟預計起始日:</div> 
 						<div class="field_div2">
-							<div class="input-group" id="scheduled_entry_date" style="width:100%;max-width:250px;">
-								<input type="text" class="form-control" name="scheduled_entry_date" aria-describedby="scheduled_entry_date" value="$scheduled_entry_date" onchange="setEdit();">
-								<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#scheduled_entry_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-							</div>
-							<script type="text/javascript">
-								$(function () {
-									$('#scheduled_entry_date').datetimepicker({
-										locale: 'zh-tw'
-										,format:"YYYY-MM-DD"
-										,allowInputToggle: true
-									});
-								});
-							</script>
+							<div class="size14 weight">$scheduled_entry_date</div>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">本棟實際起始日:</div> 
 						<div class="field_div2">
-							<div class="input-group" id="actual_entry_date" style="width:100%;max-width:250px;">
-								<input type="text" class="form-control" name="actual_entry_date" aria-describedby="actual_entry_date" value="$actual_entry_date" onchange="setEdit();">
-								<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_entry_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-							</div>
-							<script type="text/javascript">
-								$(function () {
-									$('#actual_entry_date').datetimepicker({
-										locale: 'zh-tw'
-										,format:"YYYY-MM-DD"
-										,allowInputToggle: true
-									});
-								});
-							</script>
+							<div class="size14 weight">$actual_entry_date</div>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">首層施作天數:</div> 
 						<div class="field_div2">
-							<input type="text" class="inputtext" id="construction_days_first_floor" name="construction_days_first_floor" size="20" style="width:100%;max-width:80px;" value="$construction_days_first_floor" onchange="setEdit();"/>
+							<div class="size14 weight">$construction_days_first_floor</div>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">每層施作天數:</div> 
 						<div class="field_div2">
-							<input type="text" class="inputtext" id="construction_days_per_floor" name="construction_days_per_floor" size="20" style="width:100%;max-width:80px;" value="$construction_days_per_floor" onchange="setEdit();"/>
+							<div class="size14 weight">$construction_days_per_floor</div>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">標準層範圍:</div> 
 						<div class="field_div2">
-							<input type="text" class="inputtext" id="std_layer_floor" name="std_layer_floor" size="20" style="width:100%;max-width:400px;" value="$std_layer_floor" onchange="setEdit();"/>
+							<div class="size14 weight">$std_layer_floor</div>
+						</div> 
+					</div>
+					<div>
+						<div class="field_div1">標準層數量(M2):</div> 
+						<div class="field_div2">
+							<input type="text" class="inputtext" id="std_layer_qty" name="std_layer_qty" size="20" style="width:100%;max-width:120px;" value="$std_layer_qty" onchange="setEdit();"/>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">屋突層範圍:</div> 
 						<div class="field_div2">
-							<input type="text" class="inputtext" id="roof_protrusion_floor" name="roof_protrusion_floor" size="20" style="width:100%;max-width:400px;" value="$roof_protrusion_floor" onchange="setEdit();"/>
+							<div class="size14 weight">$roof_protrusion_floor</div>
+						</div> 
+					</div>
+					<div>
+						<div class="field_div1">屋突層數量(M2):</div> 
+						<div class="field_div2">
+							<input type="text" class="inputtext" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" style="width:100%;max-width:120px;" value="$roof_protrusion_qty" onchange="setEdit();"/>
+						</div> 
+					</div>
+					<div>
+						<div class="field_div1">放樣標準層數量(M2):</div> 
+						<div class="field_div2">
+							<input type="text" class="inputtext" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" style="width:100%;max-width:120px;" value="$layout_std_layer_qty" onchange="setEdit();"/>
+						</div> 
+					</div>
+					<div>
+						<div class="field_div1">放樣屋突層數量(M2):</div> 
+						<div class="field_div2">
+							<input type="text" class="inputtext" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" style="width:100%;max-width:120px;" value="$layout_roof_protrusion_qty" onchange="setEdit();"/>
 						</div> 
 					</div>
 					<div>
 						<div class="field_div1">代工數:</div> 
 						<div class="field_div2">
-							<input type="text" class="inputtext" id="outsourcing" name="construction_days_fioutsourcingrst_floor" size="20" style="width:100%;max-width:80px;" value="$outsourcing" onchange="setEdit();"/>
+							<div class="size14 weight">$outsourcing</div>
 						</div> 
 					</div>
 				</div>

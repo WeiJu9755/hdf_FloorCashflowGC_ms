@@ -40,6 +40,8 @@ switch($ch) {
 		$smarty->assign('show_center',$show_center);
 		$smarty->assign('xajax_javascript', $xajax->getJavascript('/xajax/'));
 		break;
+			*/
+			
 	case 'buildings_sub_modify':
 		$title = "編輯總棟數";
 		$sid = "view01";
@@ -48,6 +50,7 @@ switch($ch) {
 		$smarty->assign('show_center',$show_center);
 		$smarty->assign('xajax_javascript', $xajax->getJavascript('/xajax/'));
 		break;
+		/*
 	case 'buildings_sub_detail_add':
 		$title = "新增樓層";
 		$sid = "view01";

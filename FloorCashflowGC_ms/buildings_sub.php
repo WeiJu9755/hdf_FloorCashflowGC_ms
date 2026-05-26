@@ -153,9 +153,11 @@ $list_view
 				var mtable = "";
 					mtable = '<div class="mytable w-100 size14">'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap w-75 px-1">標準層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[7]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight"></div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[8]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight"></div></div>'
+						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[8]+'</div></div>'
+						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[9]+'</div></div>'
+						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[10]+'</div></div>'
+						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">放樣標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[11]+'</div></div>'
+						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">放樣屋突層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[12]+'</div></div>'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">首層施作天數：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[5]+'</div></div>'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">每層施作天數：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[6]+'</div></div>'
 						+'</div>';
