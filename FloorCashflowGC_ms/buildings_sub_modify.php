@@ -158,6 +158,65 @@ $style_css=<<<EOT
 .field_div1 {width:250px;display: none;font-size:18px;color:#000;text-align:right;font-weight:700;padding:15px 10px 0 0;vertical-align: top;display:inline-block;zoom: 1;*display: inline;}
 .field_div2 {width:100%;max-width:520px;display: none;font-size:18px;color:#000;text-align:left;font-weight:700;padding:8px 0 0 0;vertical-align: top;display:inline-block;zoom: 1;*display: inline;}
 
+.modify_section {
+	border-top: 1px solid #d7dee4;
+	padding: 18px 0 4px 0;
+	margin-top: 12px;
+}
+
+.modify_section:first-child {
+	border-top: 0;
+	margin-top: 0;
+}
+
+.section_title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 12px;
+}
+
+.readonly_grid,
+.edit_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px 24px;
+}
+
+.readonly_item,
+.edit_item {
+	min-height: 52px;
+}
+
+.field_label {
+	font-size: 14px;
+	font-weight: 700;
+	color: #555;
+	margin-bottom: 4px;
+}
+
+.field_value {
+	min-height: 32px;
+	padding: 6px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+	word-break: break-word;
+}
+
+.field_value_main {
+	color: #0d6efd;
+}
+
+.label_highlight {
+	color: #dc3545;
+}
+
+.qty_input {
+	width: 100%;
+	max-width: 180px;
+}
+
 .maxwidth {
     width: 100%;
     max-width: 250px;
@@ -189,6 +248,65 @@ $style_css=<<<EOT
 .field_div1 {width:100%;display: block;font-size:18px;color:#000;text-align:left;font-weight:700;padding:15px 10px 0 0;vertical-align: top;}
 .field_div2 {width:100%;display: block;font-size:18px;color:#000;text-align:left;font-weight:700;padding:8px 10px 0 0;vertical-align: top;}
 
+.modify_section {
+	border-top: 1px solid #d7dee4;
+	padding: 16px 10px 4px 10px;
+	margin-top: 10px;
+}
+
+.modify_section:first-child {
+	border-top: 0;
+	margin-top: 0;
+}
+
+.section_title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 12px;
+}
+
+.readonly_grid,
+.edit_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+}
+
+.readonly_item,
+.edit_item {
+	min-height: 50px;
+}
+
+.field_label {
+	font-size: 14px;
+	font-weight: 700;
+	color: #555;
+	margin-bottom: 4px;
+}
+
+.field_value {
+	min-height: 30px;
+	padding: 6px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+	word-break: break-word;
+}
+
+.field_value_main {
+	color: #0d6efd;
+}
+
+.label_highlight {
+	color: #dc3545;
+}
+
+.qty_input {
+	width: 100%;
+	max-width: 180px;
+}
+
 .maxwidth {
     width: 100%;
 }
@@ -214,80 +332,63 @@ $style_css
 		<div id="info_container">
 			<form method="post" id="modifyForm" name="modifyForm" enctype="multipart/form-data" action="javascript:void(null);">
 				<div class="field_container3">
-					<div>
-						<div class="field_div1">棟別:</div> 
-						<div class="field_div2">
-							<!--
-							<input type="text" class="inputtext" id="building" name="building" size="20" style="width:100%;max-width:80px;" value="$building" onchange="setEdit();">
-							-->
-							<div class="size14 weight blue01">$building</div>
-						</div> 
+					<div class="modify_section">
+						<div class="section_title">基本資料</div>
+						<div class="readonly_grid">
+							<div class="readonly_item">
+								<div class="field_label">棟別</div>
+								<div class="field_value field_value_main">$building</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">代工數</div>
+								<div class="field_value">$outsourcing</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">本棟預計起始日</div>
+								<div class="field_value">$scheduled_entry_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">本棟實際起始日</div>
+								<div class="field_value">$actual_entry_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">首層施作天數</div>
+								<div class="field_value">$construction_days_first_floor</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">每層施作天數</div>
+								<div class="field_value">$construction_days_per_floor</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">標準層範圍</div>
+								<div class="field_value">$std_layer_floor</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">屋突層範圍</div>
+								<div class="field_value">$roof_protrusion_floor</div>
+							</div>
+						</div>
 					</div>
-					<div>
-						<div class="field_div1">本棟預計起始日:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$scheduled_entry_date</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">本棟實際起始日:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$actual_entry_date</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">首層施作天數:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$construction_days_first_floor</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">每層施作天數:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$construction_days_per_floor</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">標準層範圍:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$std_layer_floor</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">標準層數量(M2):</div> 
-						<div class="field_div2">
-							<input type="text" class="inputtext" id="std_layer_qty" name="std_layer_qty" size="20" style="width:100%;max-width:120px;" value="$std_layer_qty" onchange="setEdit();"/>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">屋突層範圍:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$roof_protrusion_floor</div>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">屋突層數量(M2):</div> 
-						<div class="field_div2">
-							<input type="text" class="inputtext" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" style="width:100%;max-width:120px;" value="$roof_protrusion_qty" onchange="setEdit();"/>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">放樣標準層數量(M2):</div> 
-						<div class="field_div2">
-							<input type="text" class="inputtext" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" style="width:100%;max-width:120px;" value="$layout_std_layer_qty" onchange="setEdit();"/>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">放樣屋突層數量(M2):</div> 
-						<div class="field_div2">
-							<input type="text" class="inputtext" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" style="width:100%;max-width:120px;" value="$layout_roof_protrusion_qty" onchange="setEdit();"/>
-						</div> 
-					</div>
-					<div>
-						<div class="field_div1">代工數:</div> 
-						<div class="field_div2">
-							<div class="size14 weight">$outsourcing</div>
-						</div> 
+					<div class="modify_section">
+						<div class="section_title">數量設定</div>
+						<div class="edit_grid">
+							<div class="edit_item">
+								<div class="field_label">標準層數量(M2)</div>
+								<input type="text" class="inputtext qty_input" id="std_layer_qty" name="std_layer_qty" size="20" value="$std_layer_qty" onchange="setEdit();"/>
+							</div>
+							<div class="edit_item">
+								<div class="field_label">屋突層數量(M2)</div>
+								<input type="text" class="inputtext qty_input" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" value="$roof_protrusion_qty" onchange="setEdit();"/>
+							</div>
+							<div class="edit_item">
+								<div class="field_label"><span class="label_highlight">放樣</span>標準層數量(M2)</div>
+								<input type="text" class="inputtext qty_input" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" value="$layout_std_layer_qty" onchange="setEdit();"/>
+							</div>
+							<div class="edit_item">
+								<div class="field_label"><span class="label_highlight">放樣</span>屋突層數量(M2)</div>
+								<input type="text" class="inputtext qty_input" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" value="$layout_roof_protrusion_qty" onchange="setEdit();"/>
+							</div>
+						</div>
 					</div>
 				</div>
 				<div class="form_btn_div mt-5">

@@ -54,7 +54,12 @@
 	/*
 	 * Ordering
 	 */
-	$sOrder = "ORDER BY a.auto_seq ";
+	$sOrder = "ORDER BY
+		CASE
+			WHEN a.floor REGEXP '^R[0-9]+F$' THEN 1
+			ELSE 0
+		END,
+		CAST(REPLACE(REPLACE(a.floor, 'R', ''), 'F', '') AS UNSIGNED) ";
 	/*
 	if ( isset( $_GET['iSortCol_0'] ) )
 	{

@@ -111,6 +111,14 @@ a:active {
   color: #dc3545 !important; /* 點擊當下 */
 }
 
+.load-building-content {
+	cursor: pointer;
+}
+
+.load-building-content:hover {
+	background-color: #f8f9fa;
+}
+
 </style>
 
 $list_view
@@ -151,7 +159,7 @@ $list_view
 
 				//表格化
 				var mtable = "";
-					mtable = '<div class="mytable w-100 size14">'
+					mtable = '<div class="mytable w-100 size14 load-building-content" onclick="'+buildings_sub_detail+'">'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap w-75 px-1">標準層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[7]+'</div></div>'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[8]+'</div></div>'
 						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[9]+'</div></div>'
