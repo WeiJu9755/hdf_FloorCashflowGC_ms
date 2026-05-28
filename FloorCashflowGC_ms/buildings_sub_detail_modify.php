@@ -27,15 +27,12 @@ function processform($aFormValues){
 	
 	$memberID							= trim($aFormValues['memberID']);
 	$auto_seq							= trim($aFormValues['auto_seq']);
-	$template_estimated_working_days	= trim($aFormValues['template_estimated_working_days']);
-	$expected_submission_date			= trim($aFormValues['expected_submission_date']);
-	$delivery_date						= trim($aFormValues['delivery_date']);
-	$expected_grouting_date				= trim($aFormValues['expected_grouting_date']);
-	$expected_actual_delivery_date		= trim($aFormValues['expected_actual_delivery_date']);
-	$expected_actual_grouting_date		= trim($aFormValues['expected_actual_grouting_date']);
-	$actual_submission_date				= trim($aFormValues['actual_submission_date']);
-	$actual_grouting_date				= trim($aFormValues['actual_grouting_date']);
-	$application_status					= trim($aFormValues['application_status']);
+	$actual_billing_date				= trim($aFormValues['actual_billing_date']);
+	$project_progress					= trim($aFormValues['project_progress']);
+	$actual_collection_amount			= trim($aFormValues['actual_collection_amount']);
+	$actual_collection_date				= trim($aFormValues['actual_collection_date']);
+	$payment_request_stage				= trim($aFormValues['payment_request_stage']);
+	$remark								= trim($aFormValues['remark']);
 	
 	/*
 	if (trim($aFormValues['engineering_overview']) == "")	{
@@ -50,15 +47,12 @@ function processform($aFormValues){
 	$mDB = new MywebDB();
 
 	$Qry="UPDATE buildings_sub_detail set
-			 template_estimated_working_days	= '$template_estimated_working_days'
-			,expected_submission_date	= '$expected_submission_date'
-			,delivery_date	= '$delivery_date'
-			,expected_grouting_date	= '$expected_grouting_date'
-			,expected_actual_delivery_date	= '$expected_actual_delivery_date'
-			,expected_actual_grouting_date	= '$expected_actual_grouting_date'
-			,actual_submission_date	= '$actual_submission_date'
-			,actual_grouting_date= '$actual_grouting_date'
-			,application_status	= '$application_status'
+			 actual_billing_date	= '$actual_billing_date'
+			,project_progress	= '$project_progress'
+			,actual_collection_amount	= '$actual_collection_amount'
+			,actual_collection_date	= '$actual_collection_date'
+			,payment_request_stage	= '$payment_request_stage'
+			,remark	= '$remark'
 			,makeby	= '$memberID'
 			,last_modify	= now()
 			where auto_seq = '$auto_seq'";
@@ -90,8 +84,28 @@ $fm = $_GET['fm'];
 
 $mess_title = $title;
 
-$Qry="SELECT * FROM buildings_sub_detail
-WHERE auto_seq = '$auto_seq'";
+$case_id = "";
+$building = "";
+$floor = "";
+$expected_actual_delivery_date = "";
+$expected_actual_grouting_date = "";
+$expected_work_qty = "";
+$expected_collection_amount = "";
+$expected_collection_date = "";
+$actual_submission_date = "";
+$actual_grouting_date = "";
+$actual_billing_date = "";
+$project_progress = "";
+$completed_qty = "";
+$actual_collection_amount = "";
+$actual_collection_date = "";
+$payment_request_stage = "";
+$remark = "";
+
+$Qry="SELECT a.*,b.completed_qty
+FROM buildings_sub_detail a
+LEFT JOIN pjprogress_sub b ON b.case_id = a.case_id AND b.building = a.building AND b.floor = a.floor
+WHERE a.auto_seq = '$auto_seq'";
 $mDB->query($Qry);
 
 
@@ -102,18 +116,57 @@ if ($total > 0) {
 	$case_id = $row['case_id'];
 	$building = $row['building'];
 	$floor = $row['floor'];
-	$template_estimated_working_days = $row['template_estimated_working_days'];
-	$expected_submission_date = $row['expected_submission_date'];
-	$delivery_date = $row['delivery_date'];
-	$expected_grouting_date = $row['expected_grouting_date'];
 	$expected_actual_delivery_date = $row['expected_actual_delivery_date'];
 	$expected_actual_grouting_date = $row['expected_actual_grouting_date'];
+	$expected_work_qty = $row['expected_work_qty'];
+	$expected_collection_amount = $row['expected_collection_amount'];
+	$expected_collection_date = $row['expected_collection_date'];
 	$actual_submission_date = $row['actual_submission_date'];
 	$actual_grouting_date = $row['actual_grouting_date'];
-	$application_status = $row['application_status'];
+	$actual_billing_date = $row['actual_billing_date'];
+	$project_progress = $row['project_progress'];
+	$completed_qty = $row['completed_qty'];
+	$actual_collection_amount = $row['actual_collection_amount'];
+	$actual_collection_date = $row['actual_collection_date'];
+	$payment_request_stage = $row['payment_request_stage'];
+	$remark = $row['remark'];
 
 }
 
+
+$mDB->remove();
+
+$mDB = "";
+$mDB = new MywebDB();
+
+//載入計價階段
+$pro_id = "project_progress";
+
+$Qry="select caption from items where pro_id = '$pro_id' order by pro_id,orderby";
+$mDB->query($Qry);
+$select_project_progress = "";
+$select_project_progress .= "<option></option>";
+
+if ($mDB->rowCount() > 0) {
+	while ($row=$mDB->fetchRow(2)) {
+		$ch_caption = $row['caption'];
+		$select_project_progress .= "<option value=\"$ch_caption\" ".mySelect($ch_caption,$project_progress).">$ch_caption</option>";
+	}
+}
+
+//載入收款階段
+$pro_id = "payment_request_stage";
+$Qry="select caption from items where pro_id = '$pro_id' order by pro_id,orderby";
+$mDB->query($Qry);
+$select_payment_request_stage = "";
+$select_payment_request_stage .= "<option></option>";
+
+if ($mDB->rowCount() > 0) {
+	while ($row=$mDB->fetchRow(2)) {
+		$ch_caption = $row['caption'];
+		$select_payment_request_stage .= "<option value=\"$ch_caption\" ".mySelect($ch_caption,$payment_request_stage).">$ch_caption</option>";
+	}
+}
 
 $mDB->remove();
 
@@ -146,12 +199,89 @@ $style_css=<<<EOT
 
 #info_container {
 	width: 100% !Important;
-	max-width: 800px; !Important;
+	max-width: 800px !Important;
 	margin: 0 auto !Important;
 }
 
 .field_div1 {width:200px;display: none;font-size:18px;color:#000;text-align:right;font-weight:700;padding:15px 10px 0 0;vertical-align: top;display:inline-block;zoom: 1;*display: inline;}
 .field_div2 {width:100%;max-width:500px;display: none;font-size:18px;color:#000;text-align:left;font-weight:700;padding:8px 0 0 0;vertical-align: top;display:inline-block;zoom: 1;*display: inline;}
+
+.modify_section {
+	border-top: 1px solid #d7dee4;
+	padding: 18px 0 4px 0;
+	margin-top: 12px;
+}
+
+.modify_section:first-child {
+	border-top: 0;
+	margin-top: 0;
+}
+
+.section_title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 12px;
+}
+
+.readonly_grid,
+.edit_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px 24px;
+}
+
+.readonly_item,
+.edit_item {
+	min-height: 52px;
+}
+
+.readonly_grid {
+	gap: 6px 24px;
+}
+
+.readonly_item {
+	min-height: 38px;
+}
+
+.field_label {
+	font-size: 14px;
+	font-weight: 700;
+	color: #555;
+	margin-bottom: 4px;
+}
+
+.field_value {
+	min-height: 32px;
+	padding: 6px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+	word-break: break-word;
+}
+
+.readonly_item .field_label {
+	margin-bottom: 1px;
+}
+
+.readonly_item .field_value {
+	min-height: 24px;
+	padding: 2px 0;
+}
+
+.field_value_main {
+	color: #0d6efd;
+}
+
+.maxwidth {
+    width: 100%;
+    max-width: 250px;
+}
+
+.remark_textarea {
+	width: 100%;
+	min-height: 88px;
+}
 
 </style>
 
@@ -181,6 +311,82 @@ $style_css=<<<EOT
 .field_div1 {width:100%;display: block;font-size:18px;color:#000;text-align:left;font-weight:700;padding:15px 10px 0 0;vertical-align: top;}
 .field_div2 {width:100%;display: block;font-size:18px;color:#000;text-align:left;font-weight:700;padding:8px 10px 0 0;vertical-align: top;}
 
+.modify_section {
+	border-top: 1px solid #d7dee4;
+	padding: 16px 10px 4px 10px;
+	margin-top: 10px;
+}
+
+.modify_section:first-child {
+	border-top: 0;
+	margin-top: 0;
+}
+
+.section_title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 12px;
+}
+
+.readonly_grid,
+.edit_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+}
+
+.readonly_item,
+.edit_item {
+	min-height: 50px;
+}
+
+.readonly_grid {
+	gap: 6px;
+}
+
+.readonly_item {
+	min-height: 38px;
+}
+
+.field_label {
+	font-size: 14px;
+	font-weight: 700;
+	color: #555;
+	margin-bottom: 4px;
+}
+
+.field_value {
+	min-height: 30px;
+	padding: 6px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+	word-break: break-word;
+}
+
+.readonly_item .field_label {
+	margin-bottom: 1px;
+}
+
+.readonly_item .field_value {
+	min-height: 24px;
+	padding: 2px 0;
+}
+
+.field_value_main {
+	color: #0d6efd;
+}
+
+.maxwidth {
+    width: 100%;
+}
+
+.remark_textarea {
+	width: 100%;
+	min-height: 96px;
+}
+
 </style>
 EOT;
 
@@ -202,188 +408,116 @@ $style_css
 	<div id="full" class="card-body data-overlayscrollbars-initialize">
 		<div id="info_container">
 			<form method="post" id="modifyForm" name="modifyForm" enctype="multipart/form-data" action="javascript:void(null);">
-			<div class="w-100 mb-5">
 				<div class="field_container3">
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">樓層:</div>
-								<div class="field_div2">
-									<div class="size12 weight blue01 pt-1">$floor</div>
-								</div> 
-							</div> 
+					<div class="modify_section">
+						<div class="section_title">基本資料</div>
+						<div class="readonly_grid">
+							<div class="readonly_item">
+								<div class="field_label">棟別</div>
+								<div class="field_value field_value_main">$building</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">樓層</div>
+								<div class="field_value field_value_main">$floor</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計+實際交版日期</div>
+								<div class="field_value">$expected_actual_delivery_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計+實際灌漿日期</div>
+								<div class="field_value">$expected_actual_grouting_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計施作數量</div>
+								<div class="field_value">$expected_work_qty</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計收款金額</div>
+								<div class="field_value">$expected_collection_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計收款日</div>
+								<div class="field_value">$expected_collection_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">實際交版日</div>
+								<div class="field_value">$actual_submission_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">實際灌漿日</div>
+								<div class="field_value">$actual_grouting_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">計價(施作)數量</div>
+								<div class="field_value">$completed_qty</div>
+							</div>
 						</div>
 					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">模板預計工作日:</div> 
-								<div class="field_div2">
-									<input type="text" class="form-control" name="template_estimated_working_days" value="$template_estimated_working_days" style="width:100%;max-width:100px;" onchange="setEdit();">
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">預計交版日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="expected_submission_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="expected_submission_date" aria-describedby="expected_submission_date" value="$expected_submission_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#expected_submission_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#expected_submission_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
+					<div class="modify_section">
+						<div class="section_title">計價與收款</div>
+						<div class="edit_grid">
+							<div class="edit_item">
+								<div class="field_label">實際計價日</div>
+								<div class="input-group maxwidth" id="actual_billing_date">
+									<input type="text" class="form-control" name="actual_billing_date" aria-describedby="actual_billing_date" value="$actual_billing_date" onchange="setEdit();">
+									<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_billing_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
+								</div>
+								<script type="text/javascript">
+									$(function () {
+										$('#actual_billing_date').datetimepicker({
+											locale: 'zh-tw'
+											,format:"YYYY-MM-DD"
+											,allowInputToggle: true
 										});
-									</script>
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">(交版日)+N天:</div> 
-								<div class="field_div2">
-									<input type="text" class="form-control" name="delivery_date" value="$delivery_date" style="width:100%;max-width:100px;" onchange="setEdit();">
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">預計灌漿日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="expected_grouting_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="expected_grouting_date" aria-describedby="expected_grouting_date" value="$expected_grouting_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#expected_grouting_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#expected_grouting_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
+									});
+								</script>
+							</div>
+							<div class="edit_item">
+								<div class="field_label">計價階段</div>
+								<select id="project_progress" name="project_progress" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
+									$select_project_progress
+								</select>
+							</div>
+							<div class="edit_item">
+								<div class="field_label">實際收款金額</div>
+								<input type="text" class="form-control maxwidth" name="actual_collection_amount" value="$actual_collection_amount" onchange="setEdit();">
+							</div>
+							<div class="edit_item">
+								<div class="field_label">實際收款日</div>
+								<div class="input-group maxwidth" id="actual_collection_date">
+									<input type="text" class="form-control" name="actual_collection_date" aria-describedby="actual_collection_date" value="$actual_collection_date" onchange="setEdit();">
+									<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_collection_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
+								</div>
+								<script type="text/javascript">
+									$(function () {
+										$('#actual_collection_date').datetimepicker({
+											locale: 'zh-tw'
+											,format:"YYYY-MM-DD"
+											,allowInputToggle: true
 										});
-									</script>
-								</div> 
-							</div> 
+									});
+								</script>
+							</div>
+							<div class="edit_item">
+								<div class="field_label">收款階段</div>
+								<select id="payment_request_stage" name="payment_request_stage" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
+									$select_payment_request_stage
+								</select>
+							</div>
+							<div class="edit_item">
+								<div class="field_label">備註</div>
+								<textarea class="form-control remark_textarea" name="remark" onchange="setEdit();">$remark</textarea>
+							</div>
 						</div>
 					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">預計+實際交版日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="expected_actual_delivery_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="expected_actual_delivery_date" aria-describedby="expected_actual_delivery_date" value="$expected_actual_delivery_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#expected_actual_delivery_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#expected_actual_delivery_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
-										});
-									</script>
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">預計+實際灌漿日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="expected_actual_grouting_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="expected_actual_grouting_date" aria-describedby="expected_actual_grouting_date" value="$expected_actual_grouting_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#expected_actual_grouting_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#expected_actual_grouting_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
-										});
-									</script>
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">實際交版日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="actual_submission_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="actual_submission_date" aria-describedby="actual_submission_date" value="$actual_submission_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_submission_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#actual_submission_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
-										});
-									</script>
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">實際灌漿日期:</div> 
-								<div class="field_div2">
-									<div class="input-group" id="actual_grouting_date" style="width:100%;max-width:250px;">
-										<input type="text" class="form-control" name="actual_grouting_date" aria-describedby="actual_grouting_date" value="$actual_grouting_date" onchange="setEdit();">
-										<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_grouting_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-									</div>
-									<script type="text/javascript">
-										$(function () {
-											$('#actual_grouting_date').datetimepicker({
-												locale: 'zh-tw'
-												,format:"YYYY-MM-DD"
-												,allowInputToggle: true
-											});
-										});
-									</script>
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div class="container-fluid">
-						<div class="row">
-							<div class="col-lg-12 col-sm-12 col-md-12">
-								<div class="field_div1">施作狀況:</div> 
-								<div class="field_div2">
-									<input type="text" class="form-control" name="application_status" value="$application_status" style="width:100%;" onchange="setEdit();">
-								</div> 
-							</div> 
-						</div>
-					</div>
-					<div>
+					<div class="form_btn_div mt-5">
 						<input type="hidden" name="fm" value="$fm" />
 						<input type="hidden" name="site_db" value="$site_db" />
 						<input type="hidden" name="memberID" value="$memberID" />
 						<input type="hidden" name="auto_seq" value="$auto_seq" />
 					</div>
 				</div>
-			</div>
 			</form>
 		</div>
 	</div>
@@ -410,42 +544,6 @@ function setSave() {
 	$('#close', window.document).removeClass("display_none");
 	$('#cancel', window.document).addClass("display_none");
 }
-
-</script>
-<script>
-
-	var series_select_list = JSON.parse('$series_select_list');
-
-	$( '.select2' ).select2( {
-		theme: "bootstrap-5",
-		data: series_select_list,
-		width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
-		placeholder: $( this ).data( 'placeholder' ),
-		closeOnSelect: false,
-		selectionCssClass: 'select2--large',
-    	dropdownCssClass: 'select2--large',
-	} );	
-
-	var series_feed_type_list = JSON.parse('$series_feed_type_list');
-	$("#feed_type").val(series_feed_type_list).select2();
-
-</script>
-<script>
-
-	var series_select_return_type_list = JSON.parse('$series_select_return_type_list');
-
-	$( '.select3' ).select2( {
-		theme: "bootstrap-5",
-		data: series_select_return_type_list,
-		width: $( this ).data( 'width' ) ? $( this ).data( 'width' ) : $( this ).hasClass( 'w-100' ) ? '100%' : 'style',
-		placeholder: $( this ).data( 'placeholder' ),
-		closeOnSelect: false,
-		selectionCssClass: 'select2--large',
-    	dropdownCssClass: 'select2--large',
-	} );	
-
-	var series_return_type_list = JSON.parse('$series_return_type_list');
-	$("#return_type").val(series_return_type_list).select2();
 
 </script>
 EOT;

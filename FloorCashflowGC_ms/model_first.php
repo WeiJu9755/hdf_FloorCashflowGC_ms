@@ -59,6 +59,7 @@ switch($ch) {
 		$smarty->assign('show_center',$show_center);
 		$smarty->assign('xajax_javascript', $xajax->getJavascript('/xajax/'));
 		break;
+				*/
 	case 'buildings_sub_detail_modify':
 		$title = "編輯樓層";
 		$sid = "view01";
@@ -67,7 +68,6 @@ switch($ch) {
 		$smarty->assign('show_center',$show_center);
 		$smarty->assign('xajax_javascript', $xajax->getJavascript('/xajax/'));
 		break;
-		*/
 	default:
 		if (empty($sid))
 			$sid = "mbpjitem";

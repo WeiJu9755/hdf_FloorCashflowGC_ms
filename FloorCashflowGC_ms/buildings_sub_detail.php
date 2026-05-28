@@ -108,36 +108,52 @@ EOT;
 
 
 
-$scroll = true;
-if (!($detect->isMobile() && !$detect->isTablet())) {
-	$scroll = false;
-}
-
-
 $show_buildings_sub_detail=<<<EOT
 <style>
 #buildings_sub_detail_table {
 	width: 100% !Important;
 	margin: 5px 0 0 0 !Important;
 }
-#buildings_sub_detail_table {
-	width: 100% !Important;
-	margin: 5px 0 0 0 !Important;
+#buildings_sub_detail_table_wrapper .dataTables_scroll {
+	width: 100%;
+	margin: 0 auto;
+}
+#buildings_sub_detail_table th,
+#buildings_sub_detail_table td {
+	white-space: nowrap !important;
+}
+#buildings_sub_detail_table_wrapper .dataTables_scrollBody {
+	overflow-y: auto !important;
+	overflow-x: auto !important;
 }
 </style>
 
 $list_view
 
 <script>
+	function getDetailOffsetByDevice() {
+		const screenWidth = window.innerWidth;
+
+		if (screenWidth <= 768) {
+			return 170;
+		} else if (screenWidth <= 1024) {
+			return 260;
+		} else {
+			return 260;
+		}
+	}
+
 	var oTable;
+	var detailScrollY = $(window).height() - getDetailOffsetByDevice();
+
 	$(document).ready(function() {
 		$('#buildings_sub_detail_table').dataTable( {
 			"processing": false,
 			"serverSide": true,
-			"responsive":  {
-				details: true
-			},//RWD響應式
-			"scrollX": '$scroll',
+			"responsive": false,
+			"scrollX": true,
+			"scrollY": detailScrollY + "px",
+			"scrollCollapse": true,
 			"paging": false,
 			"searching": false,  //禁用原生搜索
 			"ordering": false,
@@ -151,80 +167,99 @@ $list_view
         		left: 1,
     		},
 			"fnRowCallback": function( nRow, aData, iDisplayIndex ) { 
+				function showText(idx) {
+					return (aData[idx] != null && aData[idx] != "") ? aData[idx] : "";
+				}
+
+				function showDate(idx) {
+					return (aData[idx] != null && aData[idx] != "" && aData[idx] != "0000-00-00") ? aData[idx] : "";
+				}
+
+				function showAmount(idx) {
+					if (aData[idx] == null || aData[idx] == "" || aData[idx] == 0) {
+						return "";
+					}
+					return number_format(aData[idx]);
+				}
 
 				//樓層
-				var floor = "";
-				if (aData[0] != null && aData[0] != "")
-					floor = aData[0];
+				var floor = showText(0);
 
 				$('td:eq(0)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+floor+'</div>' );
 
-				//模板預計工作日
-				var template_estimated_working_days = "";
-				if (aData[1] != null && aData[1] != "")
-					template_estimated_working_days = aData[1];
-
-				$('td:eq(1)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+template_estimated_working_days+'</div>' );
-			
-				//預計交版日期
-				var expected_submission_date = "";
-				if (aData[2] != null && aData[2] != "" && aData[2] != "0000-00-00")
-					expected_submission_date = aData[2];
-
-				$('td:eq(2)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_submission_date+'</div>' );
-
-				//(交版日)+N天
-				var delivery_date = "";
-				if (aData[3] != null && aData[3] != "")
-					delivery_date = aData[3];
-
-				$('td:eq(3)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+delivery_date+'</div>' );
-
-				//預計灌漿日期
-				var expected_grouting_date = "";
-				if (aData[4] != null && aData[4] != "" && aData[4] != "0000-00-00")
-					expected_grouting_date = aData[4];
-
-				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_grouting_date+'</div>' );
-
 				//預計+實際交版日期
-				var expected_actual_delivery_date = "";
-				if (aData[5] != null && aData[5] != "" && aData[5] != "0000-00-00")
-					expected_actual_delivery_date = aData[5];
+				var expected_actual_delivery_date = showDate(1);
 
-				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_actual_delivery_date+'</div>' );
-
+				$('td:eq(1)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_actual_delivery_date+'</div>' );
+			
 				//預計+實際灌漿日期
-				var expected_actual_grouting_date = "";
-				if (aData[6] != null && aData[6] != "" && aData[6] != "0000-00-00")
-					expected_actual_grouting_date = aData[6];
+				var expected_actual_grouting_date = showDate(2);
 
-				$('td:eq(6)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_actual_grouting_date+'</div>' );
+				$('td:eq(2)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_actual_grouting_date+'</div>' );
+
+				//預計施作數量
+				var expected_work_qty = showText(3);
+
+				$('td:eq(3)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_work_qty+'</div>' );
+
+				//預計收款金額
+				var expected_collection_amount = showAmount(4);
+
+				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_amount+'</div>' );
+
+				//預計收款日
+				var expected_collection_date = showDate(5);
+
+				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_date+'</div>' );
 
 				//實際交版日期
-				var actual_submission_date = "";
-				if (aData[7] != null && aData[7] != "" && aData[7] != "0000-00-00")
-					actual_submission_date = aData[7];
+				var actual_submission_date = showDate(6);
 
-				$('td:eq(7)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_submission_date+'</div>' );
+				$('td:eq(6)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_submission_date+'</div>' );
 
 				//實際灌漿日期
-				var actual_grouting_date = "";
-				if (aData[8] != null && aData[8] != "" && aData[8] != "0000-00-00")
-					actual_grouting_date = aData[8];
+				var actual_grouting_date = showDate(7);
 
-				$('td:eq(8)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_grouting_date+'</div>' );
+				$('td:eq(7)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_grouting_date+'</div>' );
 
-				//施作狀況
-				var application_status = "";
-				if (aData[9] != null && aData[9] != "")
-					application_status = aData[9];
+				//實際計價日
+				var actual_billing_date = showDate(8);
 
-				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+application_status+'</div>' );
+				$('td:eq(8)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_billing_date+'</div>' );
+
+				//計價階段
+				var project_progress = showText(9);
+
+				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+project_progress+'</div>' );
+
+				//計價(施作)數量
+				var completed_qty = showText(10);
+
+				$('td:eq(10)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+completed_qty+'</div>' );
+
+				//實際收款金額
+				var actual_collection_amount = showAmount(11);
+
+				$('td:eq(11)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_amount+'</div>' );
+
+				//實際收款日
+				var actual_collection_date = showDate(12);
+
+				$('td:eq(12)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_date+'</div>' );
+
+				//收款階段
+				var payment_request_stage = showText(13);
+
+				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+payment_request_stage+'</div>' );
+
+				//備註
+				var remark = showText(14);
+
+				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+remark+'</div>' );
 
 				//編輯
-				var url1 = "openfancybox_edit('/index.php?ch=buildings_sub_detail_modify&auto_seq="+aData[10]+"&fm=$fm',800,'96%','');";
-				//var mdel = "buildings_sub_detail_myDel('"+aData[10]+"');";
+				var url1 = "openfancybox_edit('/index.php?ch=buildings_sub_detail_modify&auto_seq="+aData[15]+"&fm=$fm',800,'96%','');";
+				//var mdel = "buildings_sub_detail_myDel('"+aData[15]+"');";
 
 				var show_btn = '';
 					show_btn = '<div class="btn-group text-nowrap">'

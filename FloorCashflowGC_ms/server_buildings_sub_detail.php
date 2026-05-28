@@ -14,7 +14,7 @@
 	/* Array of database columns which should be read and sent back to DataTables. Use a space where
 	 * you want to insert a non-database field (for example a counter or static image)
 	 */
-	$aColumns = array( 'a.floor','a.template_estimated_working_days','a.expected_submission_date','a.delivery_date','a.expected_grouting_date','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.actual_submission_date','a.actual_grouting_date','a.application_status','a.auto_seq'
+	$aColumns = array( 'a.floor','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.expected_work_qty','a.expected_collection_amount','a.expected_collection_date','a.actual_submission_date','a.actual_grouting_date','a.actual_billing_date','a.project_progress','b.completed_qty','a.actual_collection_amount','a.actual_collection_date','a.payment_request_stage','a.remark','a.auto_seq'
 		,'a.case_id','a.building','a.makeby','a.last_modify','a.last_modify');
 	
 	/* Indexed column (used for fast and accurate table cardinality) */
@@ -131,6 +131,7 @@
 	$sQuery = "
 		SELECT SQL_CALC_FOUND_ROWS ".str_replace(" , ", " ", implode(", ", $aColumns))."
 		FROM   $sTable a
+		LEFT JOIN pjprogress_sub b ON b.case_id = a.case_id AND b.building = a.building AND b.floor = a.floor
 		$sWhere
 		$sOrder
 		$sLimit
