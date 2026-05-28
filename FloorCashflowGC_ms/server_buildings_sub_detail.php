@@ -3,9 +3,9 @@
 	//載入公用函數
 	@include_once '/website/include/pub_function.php';
 
-	$site_db = $_GET['site_db'];
-	$case_id = $_GET['case_id'];
-	$building = $_GET['building'];
+	$site_db = isset($_GET['site_db']) ? $_GET['site_db'] : "";
+	$case_id = isset($_GET['case_id']) ? $_GET['case_id'] : "";
+	$building = isset($_GET['building']) ? $_GET['building'] : "";
 	
 	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	 * Easy set variables 詮能
@@ -14,8 +14,7 @@
 	/* Array of database columns which should be read and sent back to DataTables. Use a space where
 	 * you want to insert a non-database field (for example a counter or static image)
 	 */
-	$aColumns = array( 'a.floor','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.expected_work_qty','a.expected_collection_amount','a.expected_collection_date','a.actual_submission_date','a.actual_grouting_date','a.actual_billing_date','a.project_progress','b.completed_qty','a.actual_collection_amount','a.actual_collection_date','a.payment_request_stage','a.remark','a.auto_seq'
-		,'a.case_id','a.building','a.makeby','a.last_modify','a.last_modify');
+	$aColumns = array( 'a.floor','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.first_expected_work_qty','a.first_layout_expected_work_qty','a.second_expected_work_qty','a.second_layout_expected_work_qty','a.first_expected_collection_amount','a.first_layout_expected_collection_amount','a.second_expected_collection_amount','a.second_layout_expected_collection_amount','a.expected_collection_date','a.actual_submission_date','a.actual_grouting_date','a.actual_billing_date','a.project_progress','b.completed_qty','a.actual_collection_amount','a.actual_collection_date','a.payment_request_stage','a.remark','a.auto_seq');
 	
 	/* Indexed column (used for fast and accurate table cardinality) */
 	$sIndexColumn = "auto_seq";
@@ -39,12 +38,15 @@
 	
 	mysql_select_db( $gaSql['db'], $gaSql['link'] ) or 
 		die( 'Could not select database '. $gaSql['db'] );
+
+	$case_id_sql = mysql_real_escape_string($case_id);
+	$building_sql = mysql_real_escape_string($building);
 	
 	/* 
 	 * Paging
 	 */
 	$sLimit = "";
-	if ( isset( $_GET['iDisplayStart'] ) && $_GET['iDisplayLength'] != '-1' )
+	if ( isset( $_GET['iDisplayStart'] ) && isset( $_GET['iDisplayLength'] ) && $_GET['iDisplayLength'] != '-1' )
 	{
 		$sLimit = "LIMIT ".mysql_real_escape_string( $_GET['iDisplayStart'] ).", ".
 			mysql_real_escape_string( $_GET['iDisplayLength'] );
@@ -88,12 +90,13 @@
 	 * on very large tables, and MySQL's regex functionality is very limited
 	 */
 	$sWhere = "";
-	if ( $_GET['sSearch'] != "" )
+	$sSearch = isset($_GET['sSearch']) ? $_GET['sSearch'] : "";
+	if ( $sSearch != "" )
 	{
 		$sWhere = "WHERE (";
 		for ( $i=0 ; $i<count($aColumns) ; $i++ )
 		{
-			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string( $_GET['sSearch'] )."%' OR ";
+			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string( $sSearch )."%' OR ";
 		}
 		$sWhere = substr_replace( $sWhere, "", -3 );
 		$sWhere .= ')';
@@ -102,7 +105,9 @@
 	/* Individual column filtering */
 	for ( $i=0 ; $i<count($aColumns) ; $i++ )
 	{
-		if ( $_GET['bSearchable_'.$i] == "true" && $_GET['sSearch_'.$i] != '' )
+		$bSearchable = isset($_GET['bSearchable_'.$i]) ? $_GET['bSearchable_'.$i] : "false";
+		$sSearchColumn = isset($_GET['sSearch_'.$i]) ? $_GET['sSearch_'.$i] : "";
+		if ( $bSearchable == "true" && $sSearchColumn != '' )
 		{
 			if ( $sWhere == "" )
 			{
@@ -112,7 +117,7 @@
 			{
 				$sWhere .= " AND ";
 			}
-			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string($_GET['sSearch_'.$i])."%' ";
+			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string($sSearchColumn)."%' ";
 		}
 	}
 	
@@ -123,9 +128,9 @@
 
 	
 	if ($sWhere=="")
-		$sWhere = "WHERE a.case_id = '$case_id' AND a.building = '$building' ";
+		$sWhere = "WHERE a.case_id = '$case_id_sql' AND a.building = '$building_sql' ";
 	else
-		$sWhere .= " and a.case_id = '$case_id' AND a.building = '$building' ";
+		$sWhere .= " and a.case_id = '$case_id_sql' AND a.building = '$building_sql' ";
 	
 	 
 	$sQuery = "
@@ -160,7 +165,7 @@
 	 * Output
 	 */
 	$output = array(
-		"sEcho" => intval($_GET['sEcho']),
+		"sEcho" => isset($_GET['sEcho']) ? intval($_GET['sEcho']) : 0,
 		"iTotalRecords" => $iTotal,
 		"iTotalDisplayRecords" => $iFilteredTotal,
 		"aaData" => array()
@@ -169,30 +174,25 @@
 	while ( $aRow = mysql_fetch_array( $rResult ) )
 	{
 		$row = array();
-		for ( $i=0 ; $i<count($aColumns) ; $i++ )
-		{
-			if ( $aColumns[$i] == "version" )
-			{
-				/* Special output formatting for 'version' column */
-				$row[] = ($aRow[ $aColumns[$i] ]=="0") ? '-' : $aRow[ $aColumns[$i] ];
-			}
-			else if ( $aColumns[$i] != ' ' )
-			{
-				/* General output */
-				//$row[] = $aRow[ $aColumns[$i] ];
-
-				$field = $aColumns[$i];
-				$field = str_replace("a.","",$field);
-				$field = str_replace("b.","",$field);
-				$field = str_replace("c.","",$field);
-				$field = str_replace("d.","",$field);
-				
-				$row[] = $aRow[ $field ];
-
-			}
-		}
+		$row[] = $aRow['floor'];
+		$row[] = $aRow['expected_actual_delivery_date'];
+		$row[] = $aRow['expected_actual_grouting_date'];
+		$row[] = $aRow['first_expected_work_qty']."||".$aRow['first_layout_expected_work_qty']."||".$aRow['second_expected_work_qty']."||".$aRow['second_layout_expected_work_qty'];
+		$row[] = $aRow['first_expected_collection_amount']."||".$aRow['first_layout_expected_collection_amount']."||".$aRow['second_expected_collection_amount']."||".$aRow['second_layout_expected_collection_amount'];
+		$row[] = $aRow['expected_collection_date'];
+		$row[] = $aRow['actual_submission_date'];
+		$row[] = $aRow['actual_grouting_date'];
+		$row[] = $aRow['actual_billing_date'];
+		$row[] = $aRow['project_progress'];
+		$row[] = $aRow['completed_qty'];
+		$row[] = $aRow['actual_collection_amount'];
+		$row[] = $aRow['actual_collection_date'];
+		$row[] = $aRow['payment_request_stage'];
+		$row[] = $aRow['remark'];
+		$row[] = $aRow['auto_seq'];
 		$output['aaData'][] = $row;
 	}
 	
 	echo json_encode( $output );
+
 ?>

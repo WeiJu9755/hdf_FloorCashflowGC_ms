@@ -79,7 +79,7 @@ $list_view=<<<EOT
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">樓層</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>交版日期</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>灌漿日期</th>
-							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計<br>施作數量</th>
+							<th scope="col" class="text-center text-nowrap vmiddle" style="width:10%;">施作數量</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計<br>收款金額</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計收款日</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">實際<br>交版日期</th>
@@ -125,6 +125,36 @@ $show_buildings_sub_detail=<<<EOT
 #buildings_sub_detail_table_wrapper .dataTables_scrollBody {
 	overflow-y: auto !important;
 	overflow-x: auto !important;
+}
+.work-qty-box,
+.collection-amount-box {
+	min-width: 260px;
+	line-height: 1.7;
+	text-align: left;
+	white-space: nowrap;
+}
+.work-qty-line,
+.collection-amount-line {
+	font-size: 12px;
+	color: #0f172a;
+}
+.work-qty-label,
+.collection-amount-label {
+	font-weight: 700;
+	color: #475569;
+}
+.work-qty-value,
+.collection-amount-value {
+	display: inline-block;
+	min-width: 58px;
+	font-weight: 700;
+	color: #0d6efd;
+	text-align: right;
+}
+.work-qty-gap,
+.collection-amount-gap {
+	display: inline-block;
+	width: 18px;
 }
 </style>
 
@@ -182,6 +212,34 @@ $list_view
 					return number_format(aData[idx]);
 				}
 
+				function showWorkQty(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
+					}
+					return '<div class="work-qty-box">'
+						+'<div class="work-qty-line"><span class="work-qty-label">第一次占比：</span><span class="work-qty-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value">'+values[1]+'</span></div>'
+						+'<div class="work-qty-line"><span class="work-qty-label">第二次占比：</span><span class="work-qty-value">'+values[2]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第二次放樣：</span><span class="work-qty-value">'+values[3]+'</span></div>'
+						+'</div>';
+				}
+
+				function showCollectionAmount(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
+					}
+					return '<div class="collection-amount-box">'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value">'+values[3]+'</span></div>'
+						+'</div>';
+				}
+
 				//樓層
 				var floor = showText(0);
 
@@ -197,13 +255,13 @@ $list_view
 
 				$('td:eq(2)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_actual_grouting_date+'</div>' );
 
-				//預計施作數量
-				var expected_work_qty = showText(3);
+				//施作數量
+				var work_qty = showWorkQty(3);
 
-				$('td:eq(3)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_work_qty+'</div>' );
+				$('td:eq(3)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+work_qty+'</div>' );
 
 				//預計收款金額
-				var expected_collection_amount = showAmount(4);
+				var expected_collection_amount = showCollectionAmount(4);
 
 				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_amount+'</div>' );
 

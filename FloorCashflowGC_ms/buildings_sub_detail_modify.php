@@ -89,8 +89,10 @@ $building = "";
 $floor = "";
 $expected_actual_delivery_date = "";
 $expected_actual_grouting_date = "";
-$expected_work_qty = "";
-$expected_collection_amount = "";
+$first_expected_collection_amount = "";
+$first_layout_expected_collection_amount = "";
+$second_expected_collection_amount = "";
+$second_layout_expected_collection_amount = "";
 $expected_collection_date = "";
 $actual_submission_date = "";
 $actual_grouting_date = "";
@@ -118,8 +120,10 @@ if ($total > 0) {
 	$floor = $row['floor'];
 	$expected_actual_delivery_date = $row['expected_actual_delivery_date'];
 	$expected_actual_grouting_date = $row['expected_actual_grouting_date'];
-	$expected_work_qty = $row['expected_work_qty'];
-	$expected_collection_amount = $row['expected_collection_amount'];
+	$first_expected_collection_amount = $row['first_expected_collection_amount'];
+	$first_layout_expected_collection_amount = $row['first_layout_expected_collection_amount'];
+	$second_expected_collection_amount = $row['second_expected_collection_amount'];
+	$second_layout_expected_collection_amount = $row['second_layout_expected_collection_amount'];
 	$expected_collection_date = $row['expected_collection_date'];
 	$actual_submission_date = $row['actual_submission_date'];
 	$actual_grouting_date = $row['actual_grouting_date'];
@@ -135,6 +139,15 @@ if ($total > 0) {
 
 
 $mDB->remove();
+
+$show_first_expected_collection_amount = ($first_expected_collection_amount != "" && $first_expected_collection_amount != 0) ? number_format($first_expected_collection_amount, 2) : "";
+$show_first_layout_expected_collection_amount = ($first_layout_expected_collection_amount != "" && $first_layout_expected_collection_amount != 0) ? number_format($first_layout_expected_collection_amount, 2) : "";
+$show_second_expected_collection_amount = ($second_expected_collection_amount != "" && $second_expected_collection_amount != 0) ? number_format($second_expected_collection_amount, 2) : "";
+$show_second_layout_expected_collection_amount = ($second_layout_expected_collection_amount != "" && $second_layout_expected_collection_amount != 0) ? number_format($second_layout_expected_collection_amount, 2) : "";
+$show_expected_collection_amount = "
+	<div class=\"summary_line\"><span>第一次占比：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
+	<div class=\"summary_line\"><span>第二次占比：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
+";
 
 $mDB = "";
 $mDB = new MywebDB();
@@ -283,6 +296,28 @@ $style_css=<<<EOT
 	min-height: 88px;
 }
 
+.summary_line {
+	font-size: 13px;
+	line-height: 1.7;
+	white-space: nowrap;
+}
+
+.summary_line span {
+	color: #475569;
+}
+
+.summary_line b {
+	display: inline-block;
+	min-width: 68px;
+	color: #0d6efd;
+	text-align: right;
+}
+
+.summary_gap {
+	display: inline-block;
+	width: 18px;
+}
+
 </style>
 
 EOT;
@@ -387,6 +422,28 @@ $style_css=<<<EOT
 	min-height: 96px;
 }
 
+.summary_line {
+	font-size: 13px;
+	line-height: 1.7;
+	white-space: nowrap;
+}
+
+.summary_line span {
+	color: #475569;
+}
+
+.summary_line b {
+	display: inline-block;
+	min-width: 68px;
+	color: #0d6efd;
+	text-align: right;
+}
+
+.summary_gap {
+	display: inline-block;
+	width: 18px;
+}
+
 </style>
 EOT;
 
@@ -429,12 +486,8 @@ $style_css
 								<div class="field_value">$expected_actual_grouting_date</div>
 							</div>
 							<div class="readonly_item">
-								<div class="field_label">預計施作數量</div>
-								<div class="field_value">$expected_work_qty</div>
-							</div>
-							<div class="readonly_item">
 								<div class="field_label">預計收款金額</div>
-								<div class="field_value">$expected_collection_amount</div>
+								<div class="field_value">$show_expected_collection_amount</div>
 							</div>
 							<div class="readonly_item">
 								<div class="field_label">預計收款日</div>
