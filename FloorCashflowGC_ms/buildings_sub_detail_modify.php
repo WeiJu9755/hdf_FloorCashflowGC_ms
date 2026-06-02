@@ -27,10 +27,21 @@ function processform($aFormValues){
 	
 	$memberID							= trim($aFormValues['memberID']);
 	$auto_seq							= trim($aFormValues['auto_seq']);
-	$actual_billing_date				= trim($aFormValues['actual_billing_date']);
+	$first_actual_billing_date			= trim($aFormValues['first_actual_billing_date']);
+	$first_layout_actual_billing_date	= trim($aFormValues['first_layout_actual_billing_date']);
+	$second_actual_billing_date			= trim($aFormValues['second_actual_billing_date']);
+	$second_layout_actual_billing_date	= trim($aFormValues['second_layout_actual_billing_date']);
 	$project_progress					= trim($aFormValues['project_progress']);
-	$actual_collection_amount			= trim($aFormValues['actual_collection_amount']);
-	$actual_collection_date				= trim($aFormValues['actual_collection_date']);
+	$first_actual_collection_amount		= trim($aFormValues['first_actual_collection_amount']);
+	$first_layout_actual_collection_amount	= trim($aFormValues['first_layout_actual_collection_amount']);
+	$second_actual_collection_amount	= trim($aFormValues['second_actual_collection_amount']);
+	$second_layout_actual_collection_amount	= trim($aFormValues['second_layout_actual_collection_amount']);
+	$first_actual_collection_date		= trim($aFormValues['first_actual_collection_date']);
+	$first_layout_actual_collection_date	= trim($aFormValues['first_layout_actual_collection_date']);
+	$second_actual_collection_date		= trim($aFormValues['second_actual_collection_date']);
+	$second_layout_actual_collection_date	= trim($aFormValues['second_layout_actual_collection_date']);
+	$retention_deduction_amount			= normalize_amount_for_sql($aFormValues['retention_deduction_amount']);
+	$advance_payment_deduction_amount	= normalize_amount_for_sql($aFormValues['advance_payment_deduction_amount']);
 	$payment_request_stage				= trim($aFormValues['payment_request_stage']);
 	$remark								= trim($aFormValues['remark']);
 	
@@ -46,11 +57,30 @@ function processform($aFormValues){
 	$mDB = "";
 	$mDB = new MywebDB();
 
+	$expected_collection_update_sql = calculate_manual_expected_collection_update_sql(
+		$mDB,
+		$auto_seq,
+		floatval($retention_deduction_amount),
+		floatval($advance_payment_deduction_amount)
+	);
+
 	$Qry="UPDATE buildings_sub_detail set
-			 actual_billing_date	= '$actual_billing_date'
+			 first_actual_billing_date	= '$first_actual_billing_date'
+			,first_layout_actual_billing_date	= '$first_layout_actual_billing_date'
+			,second_actual_billing_date	= '$second_actual_billing_date'
+			,second_layout_actual_billing_date	= '$second_layout_actual_billing_date'
 			,project_progress	= '$project_progress'
-			,actual_collection_amount	= '$actual_collection_amount'
-			,actual_collection_date	= '$actual_collection_date'
+			,first_actual_collection_amount	= '$first_actual_collection_amount'
+			,first_layout_actual_collection_amount	= '$first_layout_actual_collection_amount'
+			,second_actual_collection_amount	= '$second_actual_collection_amount'
+			,second_layout_actual_collection_amount	= '$second_layout_actual_collection_amount'
+			,first_actual_collection_date	= '$first_actual_collection_date'
+			,first_layout_actual_collection_date	= '$first_layout_actual_collection_date'
+			,second_actual_collection_date	= '$second_actual_collection_date'
+			,second_layout_actual_collection_date	= '$second_layout_actual_collection_date'
+			,retention_deduction_amount	= $retention_deduction_amount
+			,advance_payment_deduction_amount	= $advance_payment_deduction_amount
+			$expected_collection_update_sql
 			,payment_request_stage	= '$payment_request_stage'
 			,remark	= '$remark'
 			,makeby	= '$memberID'
@@ -68,6 +98,56 @@ function processform($aFormValues){
 		
 	
 	return $objResponse;
+}
+
+function normalize_amount_for_sql($value) {
+	$value = str_replace(",", "", trim((string)$value));
+	if ($value == "" || !is_numeric($value)) {
+		return "0";
+	}
+	return (string)floatval($value);
+}
+
+function calculate_manual_expected_collection_update_sql($mDB, $auto_seq, $new_retention_amount, $new_advance_payment_amount) {
+	$auto_seq_sql = addslashes($auto_seq);
+	$Qry="SELECT first_expected_collection_amount,first_layout_expected_collection_amount,second_expected_collection_amount,second_layout_expected_collection_amount,retention_deduction_amount,advance_payment_deduction_amount
+		FROM buildings_sub_detail
+		WHERE auto_seq = '$auto_seq_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return "";
+	}
+
+	$row = $mDB->fetchRow(2);
+	$current_parts = array(
+		floatval($row['first_expected_collection_amount']),
+		floatval($row['first_layout_expected_collection_amount']),
+		floatval($row['second_expected_collection_amount']),
+		floatval($row['second_layout_expected_collection_amount'])
+	);
+	$current_net_amount = array_sum($current_parts);
+	if ($current_net_amount == 0) {
+		return "";
+	}
+
+	$base_amount = $current_net_amount + floatval($row['retention_deduction_amount']) + floatval($row['advance_payment_deduction_amount']);
+	$new_net_amount = $base_amount - $new_retention_amount - $new_advance_payment_amount;
+	$new_parts = array();
+	$allocated_amount = 0;
+	for ($i = 0; $i < count($current_parts); $i++) {
+		if ($i == count($current_parts) - 1) {
+			$new_parts[$i] = round($new_net_amount - $allocated_amount, 2);
+		} else {
+			$new_parts[$i] = round($new_net_amount * ($current_parts[$i] / $current_net_amount), 2);
+			$allocated_amount += $new_parts[$i];
+		}
+	}
+
+	return "
+			,first_expected_collection_amount = ".$new_parts[0]."
+			,first_layout_expected_collection_amount = ".$new_parts[1]."
+			,second_expected_collection_amount = ".$new_parts[2]."
+			,second_layout_expected_collection_amount = ".$new_parts[3];
 }
 
 $xajax->processRequest();
@@ -93,14 +173,31 @@ $first_expected_collection_amount = "";
 $first_layout_expected_collection_amount = "";
 $second_expected_collection_amount = "";
 $second_layout_expected_collection_amount = "";
-$expected_collection_date = "";
+$retention_deduction_amount = "";
+$advance_payment_deduction_amount = "";
+$first_expected_collection_date_1 = "";
+$first_expected_collection_date_2 = "";
+$second_expected_collection_date_1 = "";
+$second_expected_collection_date_2 = "";
 $actual_submission_date = "";
 $actual_grouting_date = "";
 $actual_billing_date = "";
+$first_actual_billing_date = "";
+$first_layout_actual_billing_date = "";
+$second_actual_billing_date = "";
+$second_layout_actual_billing_date = "";
 $project_progress = "";
 $completed_qty = "";
 $actual_collection_amount = "";
+$first_actual_collection_amount = "";
+$first_layout_actual_collection_amount = "";
+$second_actual_collection_amount = "";
+$second_layout_actual_collection_amount = "";
 $actual_collection_date = "";
+$first_actual_collection_date = "";
+$first_layout_actual_collection_date = "";
+$second_actual_collection_date = "";
+$second_layout_actual_collection_date = "";
 $payment_request_stage = "";
 $remark = "";
 
@@ -124,17 +221,44 @@ if ($total > 0) {
 	$first_layout_expected_collection_amount = $row['first_layout_expected_collection_amount'];
 	$second_expected_collection_amount = $row['second_expected_collection_amount'];
 	$second_layout_expected_collection_amount = $row['second_layout_expected_collection_amount'];
-	$expected_collection_date = $row['expected_collection_date'];
+	$retention_deduction_amount = $row['retention_deduction_amount'];
+	$advance_payment_deduction_amount = $row['advance_payment_deduction_amount'];
+	$first_expected_collection_date_1 = $row['first_expected_collection_date_1'];
+	$first_expected_collection_date_2 = $row['first_expected_collection_date_2'];
+	$second_expected_collection_date_1 = $row['second_expected_collection_date_1'];
+	$second_expected_collection_date_2 = $row['second_expected_collection_date_2'];
 	$actual_submission_date = $row['actual_submission_date'];
 	$actual_grouting_date = $row['actual_grouting_date'];
 	$actual_billing_date = $row['actual_billing_date'];
+	$first_actual_billing_date = $row['first_actual_billing_date'];
+	$first_layout_actual_billing_date = $row['first_layout_actual_billing_date'];
+	$second_actual_billing_date = $row['second_actual_billing_date'];
+	$second_layout_actual_billing_date = $row['second_layout_actual_billing_date'];
 	$project_progress = $row['project_progress'];
 	$completed_qty = $row['completed_qty'];
 	$actual_collection_amount = $row['actual_collection_amount'];
+	$first_actual_collection_amount = $row['first_actual_collection_amount'];
+	$first_layout_actual_collection_amount = $row['first_layout_actual_collection_amount'];
+	$second_actual_collection_amount = $row['second_actual_collection_amount'];
+	$second_layout_actual_collection_amount = $row['second_layout_actual_collection_amount'];
 	$actual_collection_date = $row['actual_collection_date'];
+	$first_actual_collection_date = $row['first_actual_collection_date'];
+	$first_layout_actual_collection_date = $row['first_layout_actual_collection_date'];
+	$second_actual_collection_date = $row['second_actual_collection_date'];
+	$second_layout_actual_collection_date = $row['second_layout_actual_collection_date'];
 	$payment_request_stage = $row['payment_request_stage'];
 	$remark = $row['remark'];
 
+}
+
+if ($first_actual_billing_date == "" && $first_layout_actual_billing_date == "" && $second_actual_billing_date == "" && $second_layout_actual_billing_date == "" && $actual_billing_date != "") {
+	$first_actual_billing_date = $actual_billing_date;
+}
+if ($first_actual_collection_amount == "" && $first_layout_actual_collection_amount == "" && $second_actual_collection_amount == "" && $second_layout_actual_collection_amount == "" && $actual_collection_amount != "") {
+	$first_actual_collection_amount = $actual_collection_amount;
+}
+if ($first_actual_collection_date == "" && $first_layout_actual_collection_date == "" && $second_actual_collection_date == "" && $second_layout_actual_collection_date == "" && $actual_collection_date != "") {
+	$first_actual_collection_date = $actual_collection_date;
 }
 
 
@@ -144,9 +268,71 @@ $show_first_expected_collection_amount = ($first_expected_collection_amount != "
 $show_first_layout_expected_collection_amount = ($first_layout_expected_collection_amount != "" && $first_layout_expected_collection_amount != 0) ? number_format($first_layout_expected_collection_amount, 2) : "";
 $show_second_expected_collection_amount = ($second_expected_collection_amount != "" && $second_expected_collection_amount != 0) ? number_format($second_expected_collection_amount, 2) : "";
 $show_second_layout_expected_collection_amount = ($second_layout_expected_collection_amount != "" && $second_layout_expected_collection_amount != 0) ? number_format($second_layout_expected_collection_amount, 2) : "";
+$show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
+$show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
 $show_expected_collection_amount = "
 	<div class=\"summary_line\"><span>第一次占比：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
 	<div class=\"summary_line\"><span>第二次占比：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
+";
+$show_first_expected_collection_date_1 = ($first_expected_collection_date_1 != "" && $first_expected_collection_date_1 != "0000-00-00") ? $first_expected_collection_date_1 : "";
+$show_first_expected_collection_date_2 = ($first_expected_collection_date_2 != "" && $first_expected_collection_date_2 != "0000-00-00") ? $first_expected_collection_date_2 : "";
+$show_second_expected_collection_date_1 = ($second_expected_collection_date_1 != "" && $second_expected_collection_date_1 != "0000-00-00") ? $second_expected_collection_date_1 : "";
+$show_second_expected_collection_date_2 = ($second_expected_collection_date_2 != "" && $second_expected_collection_date_2 != "0000-00-00") ? $second_expected_collection_date_2 : "";
+$show_expected_collection_date = "
+	<div class=\"summary_line\"><span>第一次之一：</span><b>$show_first_expected_collection_date_1</b><span class=\"summary_gap\"></span><span>第一次之二：</span><b>$show_first_expected_collection_date_2</b></div>
+	<div class=\"summary_line\"><span>第二次之一：</span><b>$show_second_expected_collection_date_1</b><span class=\"summary_gap\"></span><span>第二次之二：</span><b>$show_second_expected_collection_date_2</b></div>
+";
+
+function build_actual_date_input($field_name, $field_value) {
+	return "
+		<div class=\"input-group actual_field\" id=\"$field_name\">
+			<input type=\"text\" class=\"form-control\" name=\"$field_name\" aria-describedby=\"$field_name\" value=\"$field_value\" onchange=\"setEdit();\">
+			<button class=\"btn btn-outline-secondary input-group-append input-group-addon\" type=\"button\" data-target=\"#$field_name\" data-toggle=\"datetimepicker\"><i class=\"bi bi-calendar\"></i></button>
+		</div>
+		<script type=\"text/javascript\">
+			$(function () {
+				$('#$field_name').datetimepicker({
+					locale: 'zh-tw'
+					,format:\"YYYY-MM-DD\"
+					,allowInputToggle: true
+				});
+			});
+		</script>
+	";
+}
+
+$show_actual_billing_date_inputs = "
+	<div class=\"actual_grid\">
+		<div><div class=\"actual_label\">第一次占比</div>".build_actual_date_input("first_actual_billing_date", $first_actual_billing_date)."</div>
+		<div><div class=\"actual_label\">第一次放樣</div>".build_actual_date_input("first_layout_actual_billing_date", $first_layout_actual_billing_date)."</div>
+		<div><div class=\"actual_label\">第二次占比</div>".build_actual_date_input("second_actual_billing_date", $second_actual_billing_date)."</div>
+		<div><div class=\"actual_label\">第二次放樣</div>".build_actual_date_input("second_layout_actual_billing_date", $second_layout_actual_billing_date)."</div>
+	</div>
+";
+
+$show_actual_collection_amount_inputs = "
+	<div class=\"actual_grid\">
+		<div><div class=\"actual_label\">第一次占比</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_actual_collection_amount\" value=\"$first_actual_collection_amount\" onchange=\"setEdit();\"></div>
+		<div><div class=\"actual_label\">第一次放樣</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_layout_actual_collection_amount\" value=\"$first_layout_actual_collection_amount\" onchange=\"setEdit();\"></div>
+		<div><div class=\"actual_label\">第二次占比</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_actual_collection_amount\" value=\"$second_actual_collection_amount\" onchange=\"setEdit();\"></div>
+		<div><div class=\"actual_label\">第二次放樣</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_layout_actual_collection_amount\" value=\"$second_layout_actual_collection_amount\" onchange=\"setEdit();\"></div>
+	</div>
+";
+
+$show_deduction_amount_inputs = "
+	<div class=\"actual_grid\">
+		<div><div class=\"actual_label\">扣抵保留款</div><input type=\"text\" class=\"form-control actual_field\" name=\"retention_deduction_amount\" value=\"$retention_deduction_amount\" onchange=\"setEdit();\"></div>
+		<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" name=\"advance_payment_deduction_amount\" value=\"$advance_payment_deduction_amount\" onchange=\"setEdit();\"></div>
+	</div>
+";
+
+$show_actual_collection_date_inputs = "
+	<div class=\"actual_grid\">
+		<div><div class=\"actual_label\">第一次占比</div>".build_actual_date_input("first_actual_collection_date", $first_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第一次放樣</div>".build_actual_date_input("first_layout_actual_collection_date", $first_layout_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第二次占比</div>".build_actual_date_input("second_actual_collection_date", $second_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第二次放樣</div>".build_actual_date_input("second_layout_actual_collection_date", $second_layout_actual_collection_date)."</div>
+	</div>
 ";
 
 $mDB = "";
@@ -212,7 +398,7 @@ $style_css=<<<EOT
 
 #info_container {
 	width: 100% !Important;
-	max-width: 800px !Important;
+	max-width: 960px !Important;
 	margin: 0 auto !Important;
 }
 
@@ -308,7 +494,7 @@ $style_css=<<<EOT
 
 .summary_line b {
 	display: inline-block;
-	min-width: 68px;
+	min-width: 82px;
 	color: #0d6efd;
 	text-align: right;
 }
@@ -316,6 +502,67 @@ $style_css=<<<EOT
 .summary_gap {
 	display: inline-block;
 	width: 18px;
+}
+
+.actual_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px 12px;
+}
+
+.cashflow_edit_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	align-items: start;
+}
+
+.cashflow_edit_panel {
+	border: 1px solid #d8e2ea;
+	border-radius: 8px;
+	background: #fbfdff;
+	padding: 12px;
+	min-height: 100%;
+}
+
+.cashflow_edit_panel_wide {
+	grid-column: 1 / -1;
+}
+
+.cashflow_panel_title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 10px;
+}
+
+.cashflow_panel_title i {
+	color: #0d6efd;
+}
+
+.stage_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px 18px;
+}
+
+.stage_item_wide {
+	grid-column: 1 / -1;
+}
+
+.actual_label {
+	font-size: 12px;
+	font-weight: 700;
+	color: #475569;
+	margin-bottom: 3px;
+}
+
+.actual_field {
+	width: 100%;
+	max-width: 200px;
 }
 
 </style>
@@ -434,7 +681,7 @@ $style_css=<<<EOT
 
 .summary_line b {
 	display: inline-block;
-	min-width: 68px;
+	min-width: 82px;
 	color: #0d6efd;
 	text-align: right;
 }
@@ -442,6 +689,56 @@ $style_css=<<<EOT
 .summary_gap {
 	display: inline-block;
 	width: 18px;
+}
+
+.actual_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
+}
+
+.cashflow_edit_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+.cashflow_edit_panel {
+	border: 1px solid #d8e2ea;
+	border-radius: 8px;
+	background: #fbfdff;
+	padding: 12px;
+}
+
+.cashflow_panel_title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #0b5f75;
+	margin-bottom: 10px;
+}
+
+.cashflow_panel_title i {
+	color: #0d6efd;
+}
+
+.stage_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+}
+
+.actual_label {
+	font-size: 12px;
+	font-weight: 700;
+	color: #475569;
+	margin-bottom: 3px;
+}
+
+.actual_field {
+	width: 100%;
 }
 
 </style>
@@ -490,8 +787,16 @@ $style_css
 								<div class="field_value">$show_expected_collection_amount</div>
 							</div>
 							<div class="readonly_item">
+								<div class="field_label">扣抵保留款</div>
+								<div class="field_value">$show_retention_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">扣抵預收款</div>
+								<div class="field_value">$show_advance_payment_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
 								<div class="field_label">預計收款日</div>
-								<div class="field_value">$expected_collection_date</div>
+								<div class="field_value">$show_expected_collection_date</div>
 							</div>
 							<div class="readonly_item">
 								<div class="field_label">實際交版日</div>
@@ -509,58 +814,43 @@ $style_css
 					</div>
 					<div class="modify_section">
 						<div class="section_title">計價與收款</div>
-						<div class="edit_grid">
-							<div class="edit_item">
-								<div class="field_label">實際計價日</div>
-								<div class="input-group maxwidth" id="actual_billing_date">
-									<input type="text" class="form-control" name="actual_billing_date" aria-describedby="actual_billing_date" value="$actual_billing_date" onchange="setEdit();">
-									<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_billing_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
+						<div class="cashflow_edit_grid">
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-calendar-check"></i><span>實際計價日</span></div>
+								$show_actual_billing_date_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-cash-coin"></i><span>實際收款金額</span></div>
+								$show_actual_collection_amount_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>預計扣抵金額</span></div>
+								$show_deduction_amount_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-calendar-event"></i><span>實際收款日</span></div>
+								$show_actual_collection_date_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-list-check"></i><span>階段與備註</span></div>
+								<div class="stage_grid">
+									<div>
+										<div class="field_label">計價階段</div>
+										<select id="project_progress" name="project_progress" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
+											$select_project_progress
+										</select>
+									</div>
+									<div>
+										<div class="field_label">收款階段</div>
+										<select id="payment_request_stage" name="payment_request_stage" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
+											$select_payment_request_stage
+										</select>
+									</div>
+									<div class="stage_item_wide">
+										<div class="field_label">備註</div>
+										<textarea class="form-control remark_textarea" name="remark" onchange="setEdit();">$remark</textarea>
+									</div>
 								</div>
-								<script type="text/javascript">
-									$(function () {
-										$('#actual_billing_date').datetimepicker({
-											locale: 'zh-tw'
-											,format:"YYYY-MM-DD"
-											,allowInputToggle: true
-										});
-									});
-								</script>
-							</div>
-							<div class="edit_item">
-								<div class="field_label">計價階段</div>
-								<select id="project_progress" name="project_progress" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
-									$select_project_progress
-								</select>
-							</div>
-							<div class="edit_item">
-								<div class="field_label">實際收款金額</div>
-								<input type="text" class="form-control maxwidth" name="actual_collection_amount" value="$actual_collection_amount" onchange="setEdit();">
-							</div>
-							<div class="edit_item">
-								<div class="field_label">實際收款日</div>
-								<div class="input-group maxwidth" id="actual_collection_date">
-									<input type="text" class="form-control" name="actual_collection_date" aria-describedby="actual_collection_date" value="$actual_collection_date" onchange="setEdit();">
-									<button class="btn btn-outline-secondary input-group-append input-group-addon" type="button" data-target="#actual_collection_date" data-toggle="datetimepicker"><i class="bi bi-calendar"></i></button>
-								</div>
-								<script type="text/javascript">
-									$(function () {
-										$('#actual_collection_date').datetimepicker({
-											locale: 'zh-tw'
-											,format:"YYYY-MM-DD"
-											,allowInputToggle: true
-										});
-									});
-								</script>
-							</div>
-							<div class="edit_item">
-								<div class="field_label">收款階段</div>
-								<select id="payment_request_stage" name="payment_request_stage" class="form-select maxwidth" placeholder="請選擇" onchange="setEdit();">
-									$select_payment_request_stage
-								</select>
-							</div>
-							<div class="edit_item">
-								<div class="field_label">備註</div>
-								<textarea class="form-control remark_textarea" name="remark" onchange="setEdit();">$remark</textarea>
 							</div>
 						</div>
 					</div>

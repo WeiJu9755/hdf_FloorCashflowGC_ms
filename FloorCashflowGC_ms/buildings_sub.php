@@ -47,7 +47,7 @@ $list_view=<<<EOT
 				<div class="col-3 p-1">
 					<div>
 						<div class="inline size14 weight text-nowrap me-5">總棟數</div>
-						<button type="button" class="btn btn-primary btn-sm text-nowrap mb-1" onclick="applyExpectedWorkQty();"><i class="bi bi-calculator"></i>&nbsp;套用預計數量/金額</button>
+						<button type="button" class="btn btn-primary btn-sm text-nowrap mb-1" onclick="applyExpectedWorkQty();"><i class="bi bi-calculator"></i>&nbsp;套用預計數量/金額/收款日</button>
 					</div>
 					<div>
 						<table class="table table-bordered border-dark w-100" id="buildings_sub_table">
@@ -207,8 +207,8 @@ var buildings_sub_myDraw = function(){
 
 function applyExpectedWorkQty() {
 	Swal.fire({
-		title: "套用預計數量/金額?",
-		text: "此作業會覆蓋第一次/第二次與放樣的預計施作數量、預計收款金額公式欄位。",
+		title: "套用預計數量/金額/收款日?",
+		text: "此作業會覆蓋第一次/第二次與放樣的預計施作數量、預計收款金額、預計收款日公式欄位。",
 		icon: "question",
 		showCancelButton: true,
 		confirmButtonColor: "#3085d6",

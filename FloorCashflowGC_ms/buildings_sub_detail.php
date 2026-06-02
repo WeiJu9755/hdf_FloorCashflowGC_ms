@@ -81,6 +81,8 @@ $list_view=<<<EOT
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>灌漿日期</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:10%;">施作數量</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計<br>收款金額</th>
+							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>保留款</th>
+							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>預收款</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計收款日</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">實際<br>交版日期</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">實際<br>灌漿日期</th>
@@ -96,7 +98,7 @@ $list_view=<<<EOT
 					</thead>
 					<tbody class="table-group-divider">
 						<tr>
-							<td colspan="16" class="dataTables_empty">資料載入中...</td>
+							<td colspan="18" class="dataTables_empty">資料載入中...</td>
 						</tr>
 					</tbody>
 				</table>
@@ -128,10 +130,15 @@ $show_buildings_sub_detail=<<<EOT
 }
 .work-qty-box,
 .collection-amount-box {
-	min-width: 260px;
 	line-height: 1.7;
 	text-align: left;
 	white-space: nowrap;
+}
+.work-qty-box {
+	min-width: 260px;
+}
+.collection-amount-box {
+	min-width: 320px;
 }
 .work-qty-line,
 .collection-amount-line {
@@ -146,10 +153,20 @@ $show_buildings_sub_detail=<<<EOT
 .work-qty-value,
 .collection-amount-value {
 	display: inline-block;
-	min-width: 58px;
 	font-weight: 700;
-	color: #0d6efd;
 	text-align: right;
+}
+.first-stage-value {
+	color: #2563eb;
+}
+.second-stage-value {
+	color: #b45309;
+}
+.work-qty-value {
+	min-width: 58px;
+}
+.collection-amount-value {
+	min-width: 82px;
 }
 .work-qty-gap,
 .collection-amount-gap {
@@ -221,8 +238,8 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
 					return '<div class="work-qty-box">'
-						+'<div class="work-qty-line"><span class="work-qty-label">第一次占比：</span><span class="work-qty-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value">'+values[1]+'</span></div>'
-						+'<div class="work-qty-line"><span class="work-qty-label">第二次占比：</span><span class="work-qty-value">'+values[2]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第二次放樣：</span><span class="work-qty-value">'+values[3]+'</span></div>'
+						+'<div class="work-qty-line"><span class="work-qty-label">第一次占比：</span><span class="work-qty-value first-stage-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="work-qty-line"><span class="work-qty-label">第二次占比：</span><span class="work-qty-value second-stage-value">'+values[2]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第二次放樣：</span><span class="work-qty-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -235,8 +252,36 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'</div>';
+				}
+
+				function showCollectionDate(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != '0000-00-00') ? values[i] : '';
+					}
+					return '<div class="collection-amount-box">'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次之一：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次之二：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'</div>';
+				}
+
+				function showFourStageDate(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != '0000-00-00') ? values[i] : '';
+					}
+					return '<div class="collection-amount-box">'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -265,58 +310,68 @@ $list_view
 
 				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_amount+'</div>' );
 
-				//預計收款日
-				var expected_collection_date = showDate(5);
+				//扣抵保留款
+				var retention_deduction_amount = showAmount(5);
 
-				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_date+'</div>' );
+				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-end" style="height:auto;min-height:32px;">'+retention_deduction_amount+'</div>' );
+
+				//扣抵預收款
+				var advance_payment_deduction_amount = showAmount(6);
+
+				$('td:eq(6)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-end" style="height:auto;min-height:32px;">'+advance_payment_deduction_amount+'</div>' );
+
+				//預計收款日
+				var expected_collection_date = showCollectionDate(7);
+
+				$('td:eq(7)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_date+'</div>' );
 
 				//實際交版日期
-				var actual_submission_date = showDate(6);
+				var actual_submission_date = showDate(8);
 
-				$('td:eq(6)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_submission_date+'</div>' );
+				$('td:eq(8)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_submission_date+'</div>' );
 
 				//實際灌漿日期
-				var actual_grouting_date = showDate(7);
+				var actual_grouting_date = showDate(9);
 
-				$('td:eq(7)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_grouting_date+'</div>' );
+				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_grouting_date+'</div>' );
 
 				//實際計價日
-				var actual_billing_date = showDate(8);
+				var actual_billing_date = showFourStageDate(10);
 
-				$('td:eq(8)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_billing_date+'</div>' );
+				$('td:eq(10)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_billing_date+'</div>' );
 
 				//計價階段
-				var project_progress = showText(9);
+				var project_progress = showText(11);
 
-				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+project_progress+'</div>' );
+				$('td:eq(11)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+project_progress+'</div>' );
 
 				//計價(施作)數量
-				var completed_qty = showText(10);
+				var completed_qty = showText(12);
 
-				$('td:eq(10)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+completed_qty+'</div>' );
+				$('td:eq(12)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+completed_qty+'</div>' );
 
 				//實際收款金額
-				var actual_collection_amount = showAmount(11);
+				var actual_collection_amount = showCollectionAmount(13);
 
-				$('td:eq(11)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_amount+'</div>' );
+				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_amount+'</div>' );
 
 				//實際收款日
-				var actual_collection_date = showDate(12);
+				var actual_collection_date = showFourStageDate(14);
 
-				$('td:eq(12)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_date+'</div>' );
+				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_date+'</div>' );
 
 				//收款階段
-				var payment_request_stage = showText(13);
+				var payment_request_stage = showText(15);
 
-				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+payment_request_stage+'</div>' );
+				$('td:eq(15)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+payment_request_stage+'</div>' );
 
 				//備註
-				var remark = showText(14);
+				var remark = showText(16);
 
-				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+remark+'</div>' );
+				$('td:eq(16)', nRow).html( '<div class="d-flex justify-content-start align-items-center size12 text-start" style="height:auto;min-height:32px;">'+remark+'</div>' );
 
 				//編輯
-				var url1 = "openfancybox_edit('/index.php?ch=buildings_sub_detail_modify&auto_seq="+aData[15]+"&fm=$fm',800,'96%','');";
+				var url1 = "openfancybox_edit('/index.php?ch=buildings_sub_detail_modify&auto_seq="+aData[17]+"&fm=$fm',800,'96%','');";
 				//var mdel = "buildings_sub_detail_myDel('"+aData[15]+"');";
 
 				var show_btn = '';
@@ -325,7 +380,7 @@ $list_view
 						//+'<button type="button" class="btn btn-light" onclick="'+mdel+'" title="刪除"><i class="bi bi-trash"></i></button>'
 						+'</div>';
 				
-				$('td:eq(15)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;">'+show_btn+'</div>' );
+				$('td:eq(17)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;">'+show_btn+'</div>' );
 
 				return nRow;
 			}

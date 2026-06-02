@@ -105,8 +105,8 @@ function apply_expected_work_qty($case_id,$memberID){
 	$mDB = "";
 	$mDB = new MywebDB();
 
-	ensure_expected_work_qty_columns($mDB);
-	ensure_expected_collection_amount_columns($mDB);
+
+
 
 	$Qry="SELECT * FROM CasePricingGC_sub WHERE case_id = '$case_id_sql'";
 	$mDB->query($Qry);
@@ -126,7 +126,10 @@ function apply_expected_work_qty($case_id,$memberID){
 	$first_rate = floatval($pricing_row['first_percentage']) / 100;
 	$second_rate = floatval($pricing_row['second_percentage']) / 100;
 
-	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price FROM CaseManagement WHERE case_id = '$case_id_sql'";
+	$retention_rate = get_case_percentage_sum($mDB, "retention", $case_id_sql) / 100;
+	$advance_payment_rate = get_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
+
+	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,tax_excluded FROM CaseManagement WHERE case_id = '$case_id_sql'";
 	$mDB->query($Qry);
 	if ($mDB->rowCount() == 0) {
 		$mDB->remove();
@@ -138,6 +141,8 @@ function apply_expected_work_qty($case_id,$memberID){
 	$roof_protrusion_u_price = floatval($case_row['roof_protrusion_u_price']);
 	$layout_std_floor_u_price = floatval($case_row['layout_std_floor_u_price']);
 	$square_roof_protrusion_u_price = floatval($case_row['square_roof_protrusion_u_price']);
+	$gc_price_base_date = $case_row['gc_price_base_date'];
+	$tax_multiplier = is_tax_excluded_checked($case_row['tax_excluded']) ? 1.05 : 1;
 
 	$Qry="SELECT * FROM buildings_sub WHERE case_id = '$case_id_sql' ORDER BY auto_seq";
 	$mDB->query($Qry);
@@ -177,13 +182,14 @@ function apply_expected_work_qty($case_id,$memberID){
 		$roof_qty = floatval($building_row['roof_protrusion_qty']);
 		$roof_layout_qty = floatval($building_row['layout_roof_protrusion_qty']);
 
-		$Qry="SELECT auto_seq,floor FROM buildings_sub_detail WHERE case_id = '$case_id_sql' AND building = '$building_sql'";
+		$Qry="SELECT auto_seq,floor,expected_actual_delivery_date,expected_actual_grouting_date FROM buildings_sub_detail WHERE case_id = '$case_id_sql' AND building = '$building_sql'";
 		$mDB->query($Qry);
 
 		$details = array();
 		while ($row=$mDB->fetchRow(2)) {
 			$details[] = $row;
 		}
+		usort($details, "compare_detail_floor_order");
 
 		for ($j = 0; $j < count($details); $j++) {
 			$detail_row = $details[$j];
@@ -200,28 +206,70 @@ function apply_expected_work_qty($case_id,$memberID){
 			$first_layout_expected_collection_amount = "NULL";
 			$second_expected_collection_amount = "NULL";
 			$second_layout_expected_collection_amount = "NULL";
+			$retention_deduction_amount = "NULL";
+			$advance_payment_deduction_amount = "NULL";
+			$first_expected_collection_date_1 = "NULL";
+			$first_expected_collection_date_2 = "NULL";
+			$second_expected_collection_date_1 = "NULL";
+			$second_expected_collection_date_2 = "NULL";
 
 			if ($std_count > 0 && isset($std_floors[$floor_key])) {
-				$first_expected_work_qty = round(($std_qty / $std_count) * $first_rate, 2);
-				$first_layout_expected_work_qty = round(($std_layout_qty / $std_count) * $first_rate, 2);
-				$second_expected_work_qty = round(($std_qty / $std_count) * $second_rate, 2);
-				$second_layout_expected_work_qty = round(($std_layout_qty / $std_count) * $second_rate, 2);
-				$first_expected_collection_amount = round($std_floor_u_price * $first_expected_work_qty, 2);
-				$first_layout_expected_collection_amount = round($layout_std_floor_u_price * $first_layout_expected_work_qty, 2);
-				$second_expected_collection_amount = round($std_floor_u_price * $second_expected_work_qty, 2);
-				$second_layout_expected_collection_amount = round($layout_std_floor_u_price * $second_layout_expected_work_qty, 2);
+				$work_qty = $std_qty / $std_count;
+				$layout_work_qty = $std_layout_qty / $std_count;
+				$unit_price = $std_floor_u_price;
+				$layout_unit_price = $layout_std_floor_u_price;
 			} else if ($roof_count > 0 && isset($roof_floors[$floor_key])) {
-				$first_expected_work_qty = round(($roof_qty / $roof_count) * $first_rate, 2);
-				$first_layout_expected_work_qty = round(($roof_layout_qty / $roof_count) * $first_rate, 2);
-				$second_expected_work_qty = round(($roof_qty / $roof_count) * $second_rate, 2);
-				$second_layout_expected_work_qty = round(($roof_layout_qty / $roof_count) * $second_rate, 2);
-				$first_expected_collection_amount = round($roof_protrusion_u_price * $first_expected_work_qty, 2);
-				$first_layout_expected_collection_amount = round($square_roof_protrusion_u_price * $first_layout_expected_work_qty, 2);
-				$second_expected_collection_amount = round($roof_protrusion_u_price * $second_expected_work_qty, 2);
-				$second_layout_expected_collection_amount = round($square_roof_protrusion_u_price * $second_layout_expected_work_qty, 2);
+				$work_qty = $roof_qty / $roof_count;
+				$layout_work_qty = $roof_layout_qty / $roof_count;
+				$unit_price = $roof_protrusion_u_price;
+				$layout_unit_price = $square_roof_protrusion_u_price;
 			} else {
 				continue;
 			}
+
+			$first_expected_work_qty = round($work_qty * $first_rate, 2);
+			$first_layout_expected_work_qty = round($layout_work_qty * $first_rate, 2);
+			$second_expected_work_qty = round($work_qty * $second_rate, 2);
+			$second_layout_expected_work_qty = round($layout_work_qty * $second_rate, 2);
+
+			$base_collection_amount = round((($unit_price * $work_qty) + ($layout_unit_price * $layout_work_qty)) * $tax_multiplier, 2);
+			$retention_deduction_amount = round($base_collection_amount * $retention_rate, 2);
+			$advance_payment_deduction_amount = round($base_collection_amount * $advance_payment_rate, 2);
+			$net_collection_amount = $base_collection_amount - $retention_deduction_amount - $advance_payment_deduction_amount;
+
+			$collection_parts = allocate_expected_collection_amounts(
+				$net_collection_amount,
+				array(
+					$unit_price * $work_qty * $first_rate,
+					$layout_unit_price * $layout_work_qty * $first_rate,
+					$unit_price * $work_qty * $second_rate,
+					$layout_unit_price * $layout_work_qty * $second_rate
+				)
+			);
+			$first_expected_collection_amount = $collection_parts[0];
+			$first_layout_expected_collection_amount = $collection_parts[1];
+			$second_expected_collection_amount = $collection_parts[2];
+			$second_layout_expected_collection_amount = $collection_parts[3];
+
+			$next_expected_actual_grouting_date = "";
+			if (isset($details[$j + 1])) {
+				$next_expected_actual_grouting_date = $details[$j + 1]['expected_actual_grouting_date'];
+			}
+
+			$expected_collection_dates = calculate_floor_expected_collection_dates(
+				$pricing_row,
+				$gc_price_base_date,
+				$detail_row['expected_actual_delivery_date'],
+				$detail_row['expected_actual_grouting_date'],
+				$next_expected_actual_grouting_date,
+				$building,
+				$detail_row['floor'],
+				$warning_list
+			);
+			$first_expected_collection_date_1 = sql_date_value($expected_collection_dates[0]);
+			$first_expected_collection_date_2 = sql_date_value($expected_collection_dates[1]);
+			$second_expected_collection_date_1 = sql_date_value($expected_collection_dates[2]);
+			$second_expected_collection_date_2 = sql_date_value($expected_collection_dates[3]);
 
 			$detail_auto_seq = $detail_row['auto_seq'];
 			$Qry="UPDATE buildings_sub_detail SET
@@ -233,6 +281,12 @@ function apply_expected_work_qty($case_id,$memberID){
 				,first_layout_expected_collection_amount = $first_layout_expected_collection_amount
 				,second_expected_collection_amount = $second_expected_collection_amount
 				,second_layout_expected_collection_amount = $second_layout_expected_collection_amount
+				,retention_deduction_amount = $retention_deduction_amount
+				,advance_payment_deduction_amount = $advance_payment_deduction_amount
+				,first_expected_collection_date_1 = $first_expected_collection_date_1
+				,first_expected_collection_date_2 = $first_expected_collection_date_2
+				,second_expected_collection_date_1 = $second_expected_collection_date_1
+				,second_expected_collection_date_2 = $second_expected_collection_date_2
 				,makeby = '$memberID_sql'
 				,last_modify = now()
 				WHERE auto_seq = '$detail_auto_seq'";
@@ -247,7 +301,7 @@ function apply_expected_work_qty($case_id,$memberID){
 	if (count($warning_list) > 0) {
 		$warning_text = "\\n提醒：".implode("、", array_unique($warning_list));
 	}
-	$tip_text = addslashes("已套用預計施作數量與收款金額：".$updated_count." 筆".$warning_text);
+	$tip_text = addslashes("已套用預計施作數量、收款金額與收款日：".$updated_count." 筆".$warning_text);
 
 	$objResponse->script("buildings_sub_myDraw();");
 	$objResponse->script("if (typeof buildings_sub_detail_myDraw == 'function') { buildings_sub_detail_myDraw(); }");
@@ -256,38 +310,286 @@ function apply_expected_work_qty($case_id,$memberID){
 	return $objResponse;
 }
 
-function ensure_expected_work_qty_columns($mDB) {
-	$columns = array(
-		"first_expected_work_qty" => "ALTER TABLE buildings_sub_detail ADD COLUMN first_expected_work_qty DECIMAL(12,2) DEFAULT NULL COMMENT '第一次預計施作數量' AFTER expected_actual_grouting_date",
-		"first_layout_expected_work_qty" => "ALTER TABLE buildings_sub_detail ADD COLUMN first_layout_expected_work_qty DECIMAL(12,2) DEFAULT NULL COMMENT '第一次放樣預計施作數量' AFTER first_expected_work_qty",
-		"second_expected_work_qty" => "ALTER TABLE buildings_sub_detail ADD COLUMN second_expected_work_qty DECIMAL(12,2) DEFAULT NULL COMMENT '第二次預計施作數量' AFTER first_layout_expected_work_qty",
-		"second_layout_expected_work_qty" => "ALTER TABLE buildings_sub_detail ADD COLUMN second_layout_expected_work_qty DECIMAL(12,2) DEFAULT NULL COMMENT '第二次放樣預計施作數量' AFTER second_expected_work_qty"
-	);
+function is_tax_excluded_checked($value) {
+	$value = strtoupper(trim((string)$value));
+	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
+}
 
-	foreach ($columns as $column_name => $alter_sql) {
-		$Qry="SHOW COLUMNS FROM buildings_sub_detail LIKE '$column_name'";
-		$mDB->query($Qry);
-		if ($mDB->rowCount() == 0) {
-			$mDB->query($alter_sql);
+function get_case_percentage_sum($mDB, $table_name, $case_id_sql) {
+	if (!in_array($table_name, array("retention", "advance_payment"), true)) {
+		return 0;
+	}
+
+	$Qry="SELECT COALESCE(SUM(percentage), 0) AS percentage_total FROM $table_name WHERE case_id = '$case_id_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return 0;
+	}
+
+	$row = $mDB->fetchRow(2);
+	return floatval($row['percentage_total']);
+}
+
+function allocate_expected_collection_amounts($net_amount, $weights) {
+	$total_weight = 0;
+	for ($i = 0; $i < count($weights); $i++) {
+		$weights[$i] = floatval($weights[$i]);
+		$total_weight += $weights[$i];
+	}
+
+	if ($total_weight == 0) {
+		return array("NULL", "NULL", "NULL", "NULL");
+	}
+
+	$parts = array();
+	$allocated_amount = 0;
+	for ($i = 0; $i < count($weights); $i++) {
+		if ($i == count($weights) - 1) {
+			$parts[$i] = round($net_amount - $allocated_amount, 2);
+		} else {
+			$parts[$i] = round($net_amount * ($weights[$i] / $total_weight), 2);
+			$allocated_amount += $parts[$i];
 		}
+	}
+
+	return $parts;
+}
+
+
+
+function is_valid_floorcashflow_date($date) {
+	if ($date == "" || $date == "0000-00-00") {
+		return false;
+	}
+	$date = substr($date, 0, 10);
+	$d = DateTime::createFromFormat("Y-m-d", $date);
+	return $d && $d->format("Y-m-d") === $date;
+}
+
+function move_weekend_to_next_monday($date) {
+	if (!is_valid_floorcashflow_date($date)) {
+		return "";
+	}
+	$d = new DateTime(substr($date, 0, 10));
+	$week = intval($d->format("N"));
+	if ($week == 6) {
+		$d->modify("+2 day");
+	} else if ($week == 7) {
+		$d->modify("+1 day");
+	}
+	return $d->format("Y-m-d");
+}
+
+function get_month_offset($monthText) {
+	switch (trim((string)$monthText)) {
+		case "當月":
+			return 0;
+		case "次月":
+			return 1;
+		case "次次月":
+			return 2;
+		case "次次次月":
+			return 3;
+		default:
+			return 0;
 	}
 }
 
-function ensure_expected_collection_amount_columns($mDB) {
-	$columns = array(
-		"first_expected_collection_amount" => "ALTER TABLE buildings_sub_detail ADD COLUMN first_expected_collection_amount DECIMAL(15,2) DEFAULT NULL COMMENT '第一次預計收款金額' AFTER second_layout_expected_work_qty",
-		"first_layout_expected_collection_amount" => "ALTER TABLE buildings_sub_detail ADD COLUMN first_layout_expected_collection_amount DECIMAL(15,2) DEFAULT NULL COMMENT '第一次放樣預計收款金額' AFTER first_expected_collection_amount",
-		"second_expected_collection_amount" => "ALTER TABLE buildings_sub_detail ADD COLUMN second_expected_collection_amount DECIMAL(15,2) DEFAULT NULL COMMENT '第二次預計收款金額' AFTER first_layout_expected_collection_amount",
-		"second_layout_expected_collection_amount" => "ALTER TABLE buildings_sub_detail ADD COLUMN second_layout_expected_collection_amount DECIMAL(15,2) DEFAULT NULL COMMENT '第二次放樣預計收款金額' AFTER second_expected_collection_amount"
+function get_day_number($dayText) {
+	return intval(str_replace("日", "", trim((string)$dayText)));
+}
+
+function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
+	if (!is_valid_floorcashflow_date($baseDate)) {
+		return null;
+	}
+
+	$monthOffset = get_month_offset($cutoffMonth);
+	$day = get_day_number($deadline);
+	if ($day <= 0) {
+		$day = 1;
+	}
+
+	$date = new DateTime(substr($baseDate, 0, 10));
+	$date->modify("first day of this month");
+	$date->modify("+{$monthOffset} month");
+
+	$year = $date->format("Y");
+	$month = $date->format("m");
+	$lastDay = intval(date("t", strtotime("$year-$month-01")));
+	if ($day > $lastDay) {
+		$day = $lastDay;
+	}
+
+	return new DateTime("$year-$month-" . str_pad($day, 2, "0", STR_PAD_LEFT));
+}
+
+function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays = 0) {
+	if (!is_valid_floorcashflow_date($baseDate)) {
+		return "";
+	}
+
+	$monthOffset = get_month_offset($paymentMonths);
+	$day = get_day_number($paymentDate);
+	if ($day <= 0) {
+		$day = 1;
+	}
+
+	$date = new DateTime(substr($baseDate, 0, 10));
+	$date->modify("first day of this month");
+	$date->modify("+{$monthOffset} month");
+
+	$year = $date->format("Y");
+	$month = $date->format("m");
+	$lastDay = intval(date("t", strtotime("$year-$month-01")));
+	if ($day > $lastDay) {
+		$day = $lastDay;
+	}
+
+	$result = new DateTime("$year-$month-" . str_pad($day, 2, "0", STR_PAD_LEFT));
+	if (intval($paymentDays) != 0) {
+		$result->modify("+" . intval($paymentDays) . " day");
+	}
+
+	return $result->format("Y-m-d");
+}
+
+function calculate_expected_receiving_payment_date(
+	$completion_date,
+	$cutoff_month_a,
+	$deadline_a,
+	$payment_months_a,
+	$payment_date_a,
+	$payment_days_a,
+	$cutoff_month_b = "",
+	$deadline_b = "",
+	$payment_months_b = "",
+	$payment_date_b = "",
+	$payment_days_b = 0
+) {
+	if (!is_valid_floorcashflow_date($completion_date)) {
+		return "";
+	}
+
+	$baseDate = new DateTime(substr($completion_date, 0, 10));
+	$cutoffDateA = get_cutoff_date($completion_date, $cutoff_month_a, $deadline_a);
+	if (!$cutoffDateA) {
+		return "";
+	}
+
+	$hasB = (trim((string)$cutoff_month_b) != "" && trim((string)$deadline_b) != "");
+	if (!$hasB) {
+		if ($baseDate <= $cutoffDateA) {
+			return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a);
+		}
+		$nextBaseDate = new DateTime(substr($completion_date, 0, 10));
+		$nextBaseDate->modify("first day of next month");
+		return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a);
+	}
+
+	$cutoffDateB = get_cutoff_date($completion_date, $cutoff_month_b, $deadline_b);
+	if (!$cutoffDateB) {
+		return "";
+	}
+
+	if ($baseDate <= $cutoffDateA) {
+		return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a);
+	}
+	if ($baseDate <= $cutoffDateB) {
+		return get_payment_date($completion_date, $payment_months_b, $payment_date_b, $payment_days_b);
+	}
+
+	$nextBaseDate = new DateTime(substr($completion_date, 0, 10));
+	$nextBaseDate->modify("first day of next month");
+	return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a);
+}
+
+function normalize_gc_price_base_date($base_date) {
+	$normalized_base_date = str_replace(
+		array(" ", "　", "+", "＋", "(", ")", "（", "）", "-", "－"),
+		"",
+		trim((string)$base_date)
 	);
 
-	foreach ($columns as $column_name => $alter_sql) {
-		$Qry="SHOW COLUMNS FROM buildings_sub_detail LIKE '$column_name'";
-		$mDB->query($Qry);
-		if ($mDB->rowCount() == 0) {
-			$mDB->query($alter_sql);
-		}
+	return str_replace(
+		array("兩", "二", "佔"),
+		array("2", "2", "占"),
+		$normalized_base_date
+	);
+}
+
+function calculate_expected_receiving_payment_date_by_prefix($completion_date, $row, $prefix, $seq) {
+	$date = calculate_expected_receiving_payment_date(
+		$completion_date,
+		isset($row[$prefix . "_cutoff_month_" . $seq . "a"]) ? $row[$prefix . "_cutoff_month_" . $seq . "a"] : "",
+		isset($row[$prefix . "_deadline_" . $seq . "a"]) ? $row[$prefix . "_deadline_" . $seq . "a"] : "",
+		isset($row[$prefix . "_payment_months_" . $seq . "a"]) ? $row[$prefix . "_payment_months_" . $seq . "a"] : "",
+		isset($row[$prefix . "_payment_date_" . $seq . "a"]) ? $row[$prefix . "_payment_date_" . $seq . "a"] : "",
+		isset($row[$prefix . "_payment_days_" . $seq . "a"]) ? $row[$prefix . "_payment_days_" . $seq . "a"] : 0,
+		isset($row[$prefix . "_cutoff_month_" . $seq . "b"]) ? $row[$prefix . "_cutoff_month_" . $seq . "b"] : "",
+		isset($row[$prefix . "_deadline_" . $seq . "b"]) ? $row[$prefix . "_deadline_" . $seq . "b"] : "",
+		isset($row[$prefix . "_payment_months_" . $seq . "b"]) ? $row[$prefix . "_payment_months_" . $seq . "b"] : "",
+		isset($row[$prefix . "_payment_date_" . $seq . "b"]) ? $row[$prefix . "_payment_date_" . $seq . "b"] : "",
+		isset($row[$prefix . "_payment_days_" . $seq . "b"]) ? $row[$prefix . "_payment_days_" . $seq . "b"] : 0
+	);
+
+	return move_weekend_to_next_monday($date);
+}
+
+function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_date, $delivery_date, $grouting_date, $next_grouting_date, $building, $floor, &$warning_list) {
+	$normalized_base_date = normalize_gc_price_base_date($gc_price_base_date);
+	$has_delivery_date = strpos($normalized_base_date, "交版日") !== false;
+	$has_grouting_date = strpos($normalized_base_date, "灌漿日") !== false;
+	$has_cleaning_date = strpos($normalized_base_date, "清運日") !== false;
+	$has_next_floor_grouting = strpos($normalized_base_date, "下一層灌漿日") !== false;
+	$is_grouting_cleaning = (strpos($normalized_base_date, "灌漿日清運日") !== false && $has_next_floor_grouting);
+	$is_two_ratio = (strpos($normalized_base_date, "2次占比") !== false || strpos($normalized_base_date, "分2次占比") !== false);
+	$use_two_ratio = $is_two_ratio || $is_grouting_cleaning;
+
+	$dates = array("", "", "", "");
+	$delivery_base = is_valid_floorcashflow_date($delivery_date) ? substr($delivery_date, 0, 10) : "";
+	$grouting_base = is_valid_floorcashflow_date($grouting_date) ? substr($grouting_date, 0, 10) : "";
+	$next_grouting_base = is_valid_floorcashflow_date($next_grouting_date) ? substr($next_grouting_date, 0, 10) : "";
+	$use_next_base = ($has_cleaning_date || $has_next_floor_grouting);
+
+	if ($use_next_base && $next_grouting_base == "") {
+		$warning_list[] = $building." ".$floor." 缺少下一層灌漿日";
 	}
+
+	if ($use_next_base && $next_grouting_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2);
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 1);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 2);
+		return $dates;
+	}
+
+	if (($use_two_ratio || $has_delivery_date) && $delivery_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 1);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 2);
+	} else if ($has_delivery_date) {
+		$warning_list[] = $building." ".$floor." 缺少交版日";
+	}
+
+	if (($use_two_ratio || $has_grouting_date) && $grouting_base != "") {
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 1);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 2);
+	} else if ($has_grouting_date) {
+		$warning_list[] = $building." ".$floor." 缺少灌漿日";
+	}
+
+	if (!$use_next_base && !$has_delivery_date && !$has_grouting_date && !$use_two_ratio) {
+		$warning_list[] = $building." ".$floor." 無法判斷上包計價日基準";
+	}
+
+	return $dates;
+}
+
+function sql_date_value($date) {
+	if (!is_valid_floorcashflow_date($date)) {
+		return "NULL";
+	}
+	return "'" . addslashes(substr($date, 0, 10)) . "'";
 }
 
 function parse_floor_range_list($floor_text) {
@@ -342,11 +644,34 @@ function parse_single_floor_key($floor_text) {
 	return $floor['prefix'].":".$floor['number'];
 }
 
+function get_floor_sort_value($floor_text) {
+	$floor = parse_floor_code($floor_text);
+	if ($floor === false) {
+		return 999999;
+	}
+	if ($floor['prefix'] == "R") {
+		return 1000 + $floor['number'];
+	}
+	if ($floor['prefix'] == "B") {
+		return 0 - $floor['number'];
+	}
+	return $floor['number'];
+}
+
+function compare_detail_floor_order($a, $b) {
+	$a_value = get_floor_sort_value($a['floor']);
+	$b_value = get_floor_sort_value($b['floor']);
+	if ($a_value == $b_value) {
+		return 0;
+	}
+	return ($a_value < $b_value) ? -1 : 1;
+}
+
 function parse_floor_code($floor_text) {
 	$floor_text = strtoupper(trim($floor_text));
 	$floor_text = str_replace(" ", "", $floor_text);
-	if (preg_match("/^(R)?([0-9]+)F?$/", $floor_text, $matches)) {
-		$prefix = ($matches[1] == "R") ? "R" : "N";
+	if (preg_match("/^(R|B)?([0-9]+)F?$/", $floor_text, $matches)) {
+		$prefix = ($matches[1] == "") ? "N" : $matches[1];
 		return array("prefix" => $prefix, "number" => intval($matches[2]));
 	}
 	return false;
