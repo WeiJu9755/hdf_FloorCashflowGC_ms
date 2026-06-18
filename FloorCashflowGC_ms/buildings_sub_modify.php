@@ -10,6 +10,7 @@ $detect = new Mobile_Detect;
 
 
 @include_once("/website/class/".$site_db."_info_class.php");
+require_once __DIR__."/module_modify_log.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
@@ -44,6 +45,7 @@ function processform($aFormValues){
 		//存入實體資料庫中
 		$mDB = "";
 		$mDB = new MywebDB();
+		updateFloorCashflowGCModifyLogByBuildingSeq($mDB, $auto_seq, $memberID);
 	  
 		$Qry="UPDATE buildings_sub set
 				 std_layer_qty	= '$std_layer_qty'
@@ -300,11 +302,6 @@ $style_css=<<<EOT
 
 .label_highlight {
 	color: #dc3545;
-}
-
-.qty_input {
-	width: 100%;
-	max-width: 180px;
 }
 
 .maxwidth {

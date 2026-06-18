@@ -18,6 +18,7 @@ $detect = new Mobile_Detect;
 
 //連結資料
 @include_once("/website/class/".$site_db."_info_class.php");
+require_once __DIR__."/module_modify_log.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
@@ -25,12 +26,16 @@ $xajax = new xajax();
 
 
 $xajax->registerFunction("DeleteRow");
+/**
+ * 刪除指定的樓層明細資料，並重新整理樓層明細列表。
+ */
 function DeleteRow($auto_seq){
 
 	$objResponse = new xajaxResponse();
 	
 	$mDB = "";
 	$mDB = new MywebDB();
+	updateFloorCashflowGCModifyLogByDetailSeq($mDB, $auto_seq, $_SESSION['memberID']);
 
 	//刪除主資料
 	$Qry="delete from buildings_sub_detail where auto_seq = '$auto_seq'";
@@ -47,6 +52,9 @@ function DeleteRow($auto_seq){
 
 
 $xajax->registerFunction("returnValue");
+/**
+ * 依放樣廠商代號查出廠商名稱，回填到指定畫面欄位。
+ */
 function returnValue($auto_seq,$layout){
 	$objResponse = new xajaxResponse();
 
@@ -72,12 +80,16 @@ function returnValue($auto_seq,$layout){
 }
 
 $xajax->registerFunction("buildings_sub_DeleteRow");
+/**
+ * 刪除指定的棟別資料，並重新整理棟別列表。
+ */
 function buildings_sub_DeleteRow($auto_seq){
 
 	$objResponse = new xajaxResponse();
 
 	$mDB = "";
 	$mDB = new MywebDB();
+	updateFloorCashflowGCModifyLogByBuildingSeq($mDB, $auto_seq, $_SESSION['memberID']);
 
 	//刪除主資料
 	$Qry="DELETE FROM buildings_sub WHERE auto_seq = '$auto_seq'";
@@ -93,6 +105,9 @@ function buildings_sub_DeleteRow($auto_seq){
 }
 
 $xajax->registerFunction("apply_expected_work_qty");
+/**
+ * 依案件計價設定、棟別樓層範圍與單價，批次套用預計施作數量、扣抵金額、預計收款金額與預計收款日。
+ */
 function apply_expected_work_qty($case_id,$memberID){
 
 	$objResponse = new xajaxResponse();
@@ -113,12 +128,12 @@ function apply_expected_work_qty($case_id,$memberID){
 	$pricing_count = $mDB->rowCount();
 	if ($pricing_count == 0) {
 		$mDB->remove();
-		$objResponse->script("jAlert('警示', '缺少 CasePricingGC_sub 計價設定，無法套用預計施作數量。', 'red', '', 2500);");
+		$objResponse->script("jAlert('警示', '缺少計價設定，無法套用預計施作數量，請至該工程案的「 案件計價維護-上包 」設定', 'red', '', 2500);");
 		return $objResponse;
 	}
 	if ($pricing_count > 1) {
 		$mDB->remove();
-		$objResponse->script("jAlert('警示', 'CasePricingGC_sub 同案件設定不唯一，請先確認計價設定。', 'red', '', 2500);");
+		$objResponse->script("jAlert('警示', '同案件設定不唯一，請先確認計價設定。', 'red', '', 2500);");
 		return $objResponse;
 	}
 
@@ -126,14 +141,14 @@ function apply_expected_work_qty($case_id,$memberID){
 	$first_rate = floatval($pricing_row['first_percentage']) / 100;
 	$second_rate = floatval($pricing_row['second_percentage']) / 100;
 
-	$retention_rate = get_case_percentage_sum($mDB, "retention", $case_id_sql) / 100;
+	$retention_rate = get_case_retention_percentage_sum($mDB, $case_id_sql) / 100;
 	$advance_payment_rate = get_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
 
 	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,tax_excluded FROM CaseManagement WHERE case_id = '$case_id_sql'";
 	$mDB->query($Qry);
 	if ($mDB->rowCount() == 0) {
 		$mDB->remove();
-		$objResponse->script("jAlert('警示', '找不到 CaseManagement 案件單價資料，無法套用預計收款金額。', 'red', '', 2500);");
+		$objResponse->script("jAlert('警示', '找不到案件單價資料，無法套用預計收款金額，請至該工程案的「 案件計價維護-上包 」設定', 'red', '', 2500);");
 		return $objResponse;
 	}
 	$case_row = $mDB->fetchRow(2);
@@ -295,6 +310,10 @@ function apply_expected_work_qty($case_id,$memberID){
 		}
 	}
 
+	if ($updated_count > 0) {
+		updateFloorCashflowGCModifyLog($mDB, $case_id, $memberID);
+	}
+
 	$mDB->remove();
 
 	$warning_text = "";
@@ -310,11 +329,31 @@ function apply_expected_work_qty($case_id,$memberID){
 	return $objResponse;
 }
 
+/**
+ * 判斷案件的稅別欄位是否代表未稅，未稅時預計金額需乘上稅率。
+ */
 function is_tax_excluded_checked($value) {
 	$value = strtoupper(trim((string)$value));
 	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
 }
 
+/**
+ * 加總指定案件新版 retention 所有期數的保留款佔比。
+ */
+function get_case_retention_percentage_sum($mDB, $case_id_sql) {
+	$Qry="SELECT COALESCE(SUM(percentage), 0) AS percentage_total FROM retention WHERE case_id = '$case_id_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return 0;
+	}
+
+	$row = $mDB->fetchRow(2);
+	return floatval($row['percentage_total']);
+}
+
+/**
+ * 加總指定案件在百分比資料表中的佔比。
+ */
 function get_case_percentage_sum($mDB, $table_name, $case_id_sql) {
 	if (!in_array($table_name, array("retention", "advance_payment"), true)) {
 		return 0;
@@ -330,6 +369,9 @@ function get_case_percentage_sum($mDB, $table_name, $case_id_sql) {
 	return floatval($row['percentage_total']);
 }
 
+/**
+ * 將扣抵後的預計收款淨額依四個原始權重分配，並用最後一格吸收四捨五入差額。
+ */
 function allocate_expected_collection_amounts($net_amount, $weights) {
 	$total_weight = 0;
 	for ($i = 0; $i < count($weights); $i++) {
@@ -357,6 +399,9 @@ function allocate_expected_collection_amounts($net_amount, $weights) {
 
 
 
+/**
+ * 檢查字串是否為可用的 YYYY-MM-DD 日期，並排除空值與 0000-00-00。
+ */
 function is_valid_floorcashflow_date($date) {
 	if ($date == "" || $date == "0000-00-00") {
 		return false;
@@ -366,6 +411,9 @@ function is_valid_floorcashflow_date($date) {
 	return $d && $d->format("Y-m-d") === $date;
 }
 
+/**
+ * 若日期落在週末，順延到下一個星期一。
+ */
 function move_weekend_to_next_monday($date) {
 	if (!is_valid_floorcashflow_date($date)) {
 		return "";
@@ -380,6 +428,9 @@ function move_weekend_to_next_monday($date) {
 	return $d->format("Y-m-d");
 }
 
+/**
+ * 將「當月、次月、次次月、次次次月」轉為月份位移數。
+ */
 function get_month_offset($monthText) {
 	switch (trim((string)$monthText)) {
 		case "當月":
@@ -395,10 +446,16 @@ function get_month_offset($monthText) {
 	}
 }
 
+/**
+ * 從「10日」這類付款日文字取出日期數字。
+ */
 function get_day_number($dayText) {
 	return intval(str_replace("日", "", trim((string)$dayText)));
 }
 
+/**
+ * 依基準日期、截止月份與截止日計算該月的截止日期。
+ */
 function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
 	if (!is_valid_floorcashflow_date($baseDate)) {
 		return null;
@@ -424,6 +481,9 @@ function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
 	return new DateTime("$year-$month-" . str_pad($day, 2, "0", STR_PAD_LEFT));
 }
 
+/**
+ * 依基準日期、付款月份、付款日與加計天數算出預計收款日。
+ */
 function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays = 0) {
 	if (!is_valid_floorcashflow_date($baseDate)) {
 		return "";
@@ -454,6 +514,9 @@ function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays 
 	return $result->format("Y-m-d");
 }
 
+/**
+ * 依收款條件的 A/B 截止規則，計算單一階段的預計收款日期。
+ */
 function calculate_expected_receiving_payment_date(
 	$completion_date,
 	$cutoff_month_a,
@@ -504,6 +567,9 @@ function calculate_expected_receiving_payment_date(
 	return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a);
 }
 
+/**
+ * 正規化案件的計價日基準文字，讓後續可穩定判斷交版日、灌漿日、清運日等關鍵字。
+ */
 function normalize_gc_price_base_date($base_date) {
 	$normalized_base_date = str_replace(
 		array(" ", "　", "+", "＋", "(", ")", "（", "）", "-", "－"),
@@ -518,6 +584,9 @@ function normalize_gc_price_base_date($base_date) {
 	);
 }
 
+/**
+ * 依欄位前綴與序號讀取 CasePricingGC_sub 設定，計算對應階段的預計收款日。
+ */
 function calculate_expected_receiving_payment_date_by_prefix($completion_date, $row, $prefix, $seq) {
 	$date = calculate_expected_receiving_payment_date(
 		$completion_date,
@@ -536,6 +605,9 @@ function calculate_expected_receiving_payment_date_by_prefix($completion_date, $
 	return move_weekend_to_next_monday($date);
 }
 
+/**
+ * 依樓層的交版日、灌漿日與案件計價日基準，計算四個預計收款日。
+ */
 function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_date, $delivery_date, $grouting_date, $next_grouting_date, $building, $floor, &$warning_list) {
 	$normalized_base_date = normalize_gc_price_base_date($gc_price_base_date);
 	$has_delivery_date = strpos($normalized_base_date, "交版日") !== false;
@@ -585,6 +657,9 @@ function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_
 	return $dates;
 }
 
+/**
+ * 將有效日期轉為 SQL 日期值，無效日期回傳 NULL。
+ */
 function sql_date_value($date) {
 	if (!is_valid_floorcashflow_date($date)) {
 		return "NULL";
@@ -592,6 +667,9 @@ function sql_date_value($date) {
 	return "'" . addslashes(substr($date, 0, 10)) . "'";
 }
 
+/**
+ * 解析樓層範圍文字，支援逗號分隔與連續區間，回傳可快速查找的樓層 key 清單。
+ */
 function parse_floor_range_list($floor_text) {
 	$result = array();
 	$floor_text = trim($floor_text);
@@ -636,6 +714,9 @@ function parse_floor_range_list($floor_text) {
 	return $result;
 }
 
+/**
+ * 解析單一樓層文字並轉為樓層 key。
+ */
 function parse_single_floor_key($floor_text) {
 	$floor = parse_floor_code($floor_text);
 	if ($floor === false) {
@@ -644,6 +725,9 @@ function parse_single_floor_key($floor_text) {
 	return $floor['prefix'].":".$floor['number'];
 }
 
+/**
+ * 將樓層文字轉為排序用數值，地下層在前、一般樓層其次、屋突層最後。
+ */
 function get_floor_sort_value($floor_text) {
 	$floor = parse_floor_code($floor_text);
 	if ($floor === false) {
@@ -658,6 +742,9 @@ function get_floor_sort_value($floor_text) {
 	return $floor['number'];
 }
 
+/**
+ * buildings_sub_detail 樓層排序比較函式，供 usort 使用。
+ */
 function compare_detail_floor_order($a, $b) {
 	$a_value = get_floor_sort_value($a['floor']);
 	$b_value = get_floor_sort_value($b['floor']);
@@ -667,6 +754,9 @@ function compare_detail_floor_order($a, $b) {
 	return ($a_value < $b_value) ? -1 : 1;
 }
 
+/**
+ * 解析樓層代碼，支援一般樓層、B 地下層與 R 屋突層。
+ */
 function parse_floor_code($floor_text) {
 	$floor_text = strtoupper(trim($floor_text));
 	$floor_text = str_replace(" ", "", $floor_text);

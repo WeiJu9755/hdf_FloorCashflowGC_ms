@@ -81,7 +81,7 @@ $list_view=<<<EOT
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>灌漿日期</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:10%;">施作數量</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計<br>收款金額</th>
-							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>保留款</th>
+							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>保留/租賃預收差款</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>預收款</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計收款日</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">實際<br>交版日期</th>
@@ -310,7 +310,7 @@ $list_view
 
 				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+expected_collection_amount+'</div>' );
 
-				//扣抵保留款
+				//扣抵保留/租賃預收差款
 				var retention_deduction_amount = showAmount(5);
 
 				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-end" style="height:auto;min-height:32px;">'+retention_deduction_amount+'</div>' );

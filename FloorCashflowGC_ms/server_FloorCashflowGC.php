@@ -32,10 +32,35 @@
 //	$aColumns = array( 'a.auto_seq','a.case_date','a.company_id','b.company_name','b.short_name','a.team_id','c.team_name','a.web_id','a.project_id','a.auth_id','a.case_id'
 //			,'a.case_type','a.ConfirmSending','a.ConfirmSending_datetime');
 
-	$aColumns = array( 'a.status1','a.status2','a.buildings_contract2','a.case_id','a.construction_id','a.builder_id','a.contractor_id','a.contact','a.makeby8','a.last_modify8','a.zipcode'
-		,'a.county','a.town','a.address','a.auto_seq','c.builder_name','d.contractor_name','f.member_name','a.case_type','a.owner_builder','a.owner_contractor'
-		,'a.ContractingModel','a.ERP_no','a.company_id','e.company_name','e.short_name','a.contract_date','a.total_contract_amt','a.estimated_arrival_date','a.completion_date','a.actual_entry_date'
-		,'a.actual_completion_date','a.collection_ratio');
+	$aColumns = array(
+		'a.status1',
+		'a.status2',
+		'a.case_id',
+		'a.construction_id',
+		'a.ContractingModel',
+		'c.builder_name',
+		'd.contractor_name',
+		'e.company_name',
+		'e.short_name',
+		'a.company_id',
+		'a.ERP_no',
+		'COALESCE(bs.building_count, 0) AS building_count',
+		'COALESCE(fd.floor_count, 0) AS floor_count',
+		'COALESCE(fd.expected_collection_amount, 0) AS expected_collection_amount',
+		'COALESCE(fd.actual_collection_amount, 0) AS actual_collection_amount',
+		'(COALESCE(fd.expected_collection_amount, 0) - COALESCE(fd.actual_collection_amount, 0)) AS outstanding_collection_amount',
+		'a.auto_seq',
+		'm.floor_cashflow_gc_makeby',
+		'm.floor_cashflow_gc_last_modify',
+		'f.member_name'
+	);
+
+	$aSearchColumns = array(
+		'a.status1', 'a.status2', 'a.case_id', 'a.construction_id',
+		'a.ContractingModel', 'c.builder_name', 'd.contractor_name',
+		'e.company_name', 'e.short_name', 'a.company_id', 'a.ERP_no',
+		'f.member_name'
+	);
 			
 	/* Indexed column (used for fast and accurate table cardinality) */
 	$sIndexColumn = "auto_seq";
@@ -107,29 +132,12 @@
 	if ( $_GET['sSearch'] != "" )
 	{
 		$sWhere = "WHERE (";
-		for ( $i=0 ; $i<count($aColumns) ; $i++ )
+		for ( $i=0 ; $i<count($aSearchColumns) ; $i++ )
 		{
-			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string( $_GET['sSearch'] )."%' OR ";
+			$sWhere .= $aSearchColumns[$i]." LIKE '%".mysql_real_escape_string( $_GET['sSearch'] )."%' OR ";
 		}
 		$sWhere = substr_replace( $sWhere, "", -3 );
 		$sWhere .= ')';
-	}
-	
-	/* Individual column filtering */
-	for ( $i=0 ; $i<count($aColumns) ; $i++ )
-	{
-		if ( $_GET['bSearchable_'.$i] == "true" && $_GET['sSearch_'.$i] != '' )
-		{
-			if ( $sWhere == "" )
-			{
-				$sWhere = "WHERE ";
-			}
-			else
-			{
-				$sWhere .= " AND ";
-			}
-			$sWhere .= $aColumns[$i]." LIKE '%".mysql_real_escape_string($_GET['sSearch_'.$i])."%' ";
-		}
 	}
 	
 	/*
@@ -139,10 +147,12 @@
 	 
 
 
-	if ($sWhere=="")
-		$sWhere = "WHERE a.status1 = '已簽約' or a.status1 = '已結案' or (a.status1 = '未簽約' and a.status2 = '已回簽') ";
-	else
-		$sWhere .= " and a.status1 = '已簽約' or a.status1 = '已結案' or (a.status1 = '未簽約' and a.status2 = '已回簽')  ";
+	$statusWhere = "(a.status1 = '已簽約' OR a.status1 = '已結案' OR (a.status1 = '未簽約' AND a.status2 = '已回簽'))";
+	if ($sWhere == "") {
+		$sWhere = "WHERE $statusWhere";
+	} else {
+		$sWhere .= " AND $statusWhere";
+	}
 
 	$sQuery = "
 		SELECT SQL_CALC_FOUND_ROWS ".str_replace(" , ", " ", implode(", ", $aColumns))."
@@ -150,7 +160,39 @@
 		LEFT JOIN builder c ON c.builder_id = a.builder_id
 		LEFT JOIN contractor d ON d.contractor_id = a.contractor_id
 		LEFT JOIN company e ON e.company_id = a.company_id
-		LEFT JOIN memberinfo.member f on f.member_no = a.makeby8
+		LEFT JOIN (
+			SELECT case_id, COUNT(*) AS building_count
+			FROM buildings_sub
+			GROUP BY case_id
+		) bs ON bs.case_id = a.case_id
+		LEFT JOIN (
+			SELECT
+				case_id,
+				COUNT(*) AS floor_count,
+				SUM(
+					COALESCE(first_expected_collection_amount, 0) +
+					COALESCE(first_layout_expected_collection_amount, 0) +
+					COALESCE(second_expected_collection_amount, 0) +
+					COALESCE(second_layout_expected_collection_amount, 0)
+				) AS expected_collection_amount,
+				SUM(
+					CASE
+						WHEN first_actual_collection_amount IS NULL
+						 AND first_layout_actual_collection_amount IS NULL
+						 AND second_actual_collection_amount IS NULL
+						 AND second_layout_actual_collection_amount IS NULL
+						THEN COALESCE(actual_collection_amount, 0)
+						ELSE COALESCE(first_actual_collection_amount, 0) +
+							 COALESCE(first_layout_actual_collection_amount, 0) +
+							 COALESCE(second_actual_collection_amount, 0) +
+							 COALESCE(second_layout_actual_collection_amount, 0)
+					END
+				) AS actual_collection_amount
+			FROM buildings_sub_detail
+			GROUP BY case_id
+		) fd ON fd.case_id = a.case_id
+		LEFT JOIN case_module_modify_log m ON m.case_id = a.case_id
+		LEFT JOIN memberinfo.member f on f.member_no = m.floor_cashflow_gc_makeby
 		$sWhere
 		$sOrder
 		$sLimit
@@ -202,12 +244,18 @@
 				//$row[] = $aRow[ $aColumns[$i] ];
 
 				$field = $aColumns[$i];
+				if (stripos($field, " AS ") !== false) {
+					$field_parts = preg_split('/\s+AS\s+/i', $field);
+					$field = end($field_parts);
+				}
+				$field = trim($field, "() ");
 				$field = str_replace("a.","",$field);
 				$field = str_replace("b.","",$field);
 				$field = str_replace("c.","",$field);
 				$field = str_replace("d.","",$field);
 				$field = str_replace("e.","",$field);
 				$field = str_replace("f.","",$field);
+				$field = str_replace("m.","",$field);
 				
 				$row[] = $aRow[ $field ];
 				

@@ -15,6 +15,7 @@ $detect = new Mobile_Detect;
 
 //連結資料
 @include_once("/website/class/".$site_db."_info_class.php");
+require_once __DIR__."/module_modify_log.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
@@ -56,6 +57,7 @@ function processform($aFormValues){
 	//存入實體資料庫中
 	$mDB = "";
 	$mDB = new MywebDB();
+	updateFloorCashflowGCModifyLogByDetailSeq($mDB, $auto_seq, $memberID);
 
 	$expected_collection_update_sql = calculate_manual_expected_collection_update_sql(
 		$mDB,
@@ -321,7 +323,7 @@ $show_actual_collection_amount_inputs = "
 
 $show_deduction_amount_inputs = "
 	<div class=\"actual_grid\">
-		<div><div class=\"actual_label\">扣抵保留款</div><input type=\"text\" class=\"form-control actual_field\" name=\"retention_deduction_amount\" value=\"$retention_deduction_amount\" onchange=\"setEdit();\"></div>
+		<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" name=\"retention_deduction_amount\" value=\"$retention_deduction_amount\" onchange=\"setEdit();\"></div>
 		<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" name=\"advance_payment_deduction_amount\" value=\"$advance_payment_deduction_amount\" onchange=\"setEdit();\"></div>
 	</div>
 ";
@@ -783,18 +785,6 @@ $style_css
 								<div class="field_value">$expected_actual_grouting_date</div>
 							</div>
 							<div class="readonly_item">
-								<div class="field_label">預計收款金額</div>
-								<div class="field_value">$show_expected_collection_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">扣抵保留款</div>
-								<div class="field_value">$show_retention_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">扣抵預收款</div>
-								<div class="field_value">$show_advance_payment_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
 								<div class="field_label">預計收款日</div>
 								<div class="field_value">$show_expected_collection_date</div>
 							</div>
@@ -805,6 +795,18 @@ $style_css
 							<div class="readonly_item">
 								<div class="field_label">實際灌漿日</div>
 								<div class="field_value">$actual_grouting_date</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">預計收款金額</div>
+								<div class="field_value">$show_expected_collection_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">扣抵保留/租賃預收差款</div>
+								<div class="field_value">$show_retention_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">扣抵預收款</div>
+								<div class="field_value">$show_advance_payment_deduction_amount</div>
 							</div>
 							<div class="readonly_item">
 								<div class="field_label">計價(施作)數量</div>

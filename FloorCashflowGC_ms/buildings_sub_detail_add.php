@@ -10,6 +10,7 @@ $detect = new Mobile_Detect;
 
 
 @include_once("/website/class/".$site_db."_info_class.php");
+require_once __DIR__."/module_modify_log.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
@@ -44,6 +45,7 @@ function processform($aFormValues){
 	  
 		$Qry="insert into buildings_sub_detail (case_id,building,floor,makeby,last_modify) values ('$case_id','$building','$floor','$memberID',now())";
 		$mDB->query($Qry);
+		updateFloorCashflowGCModifyLog($mDB, $case_id, $memberID);
 		//再取出auto_seq
 		$Qry="select auto_seq from buildings_sub_detail where case_id = '$case_id' and building = '$building' and floor = '$floor' order by auto_seq desc limit 0,1";
 		$mDB->query($Qry);

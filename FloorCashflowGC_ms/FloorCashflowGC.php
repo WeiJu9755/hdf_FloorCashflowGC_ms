@@ -19,6 +19,7 @@ if (!($detect->isMobile() && !$detect->isTablet())) {
 }
 
 @include_once("/website/class/".$site_db."_info_class.php");
+require_once __DIR__."/module_modify_log.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
@@ -38,6 +39,12 @@ function owner_builder($auto_seq,$check,$memberID){
 			,last_modify8 = now()
 			where auto_seq = '$auto_seq'";
 	$mDB->query($Qry);
+	$Qry = "SELECT case_id FROM CaseManagement WHERE auto_seq = '$auto_seq' LIMIT 1";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() > 0) {
+		$row = $mDB->fetchRow(2);
+		updateFloorCashflowGCModifyLog($mDB, $row['case_id'], $memberID);
+	}
 	$mDB->remove();
 	
     $objResponse->script("oTable = $('#db_table').dataTable();oTable.fnDraw(false)");
@@ -59,6 +66,12 @@ function owner_contractor($auto_seq,$check,$memberID){
 			,last_modify8 = now()
 			where auto_seq = '$auto_seq'";
 	$mDB->query($Qry);
+	$Qry = "SELECT case_id FROM CaseManagement WHERE auto_seq = '$auto_seq' LIMIT 1";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() > 0) {
+		$row = $mDB->fetchRow(2);
+		updateFloorCashflowGCModifyLog($mDB, $row['case_id'], $memberID);
+	}
 	$mDB->remove();
 	
     $objResponse->script("oTable = $('#db_table').dataTable();oTable.fnDraw(false)");
@@ -81,11 +94,11 @@ $auth_id = "PF001";
 if (isset($_GET['pjt']))
 	$pjt = $_GET['pjt'];
 else
-	$pjt = "金流基本資料";
+	$pjt = "上包樓層金流維護";
 
 
 $tb = "CaseManagement";
-$pro_id = "CashflowGC";
+$pro_id = "FloorCashflowGC";
 
 $m_t = urlencode($_GET['pjt']);
 
@@ -271,25 +284,21 @@ $list_view=<<<EOT
 				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">案件編號</th>
 				<th class="text-center text-nowrap" style="width:10%;padding: 10px;background-color: #CBF3FC;">工程名稱</th>
 				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">承攬模式</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">上包<br>建商名稱</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">上包<br>營造廠名稱</th>
+				<th class="text-center text-nowrap" style="width:8%;padding: 10px;background-color: #CBF3FC;">上包建商</th>
+				<th class="text-center text-nowrap" style="width:8%;padding: 10px;background-color: #CBF3FC;">上包營造廠</th>
 				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">所屬公司</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">合約號碼<br>(ERP專案代號)</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">合約承攬建物棟數</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">簽約日期</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">合約簽約金額</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">預計進場時間</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">預計完工時間</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">實際進場時間</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">實際完工時間</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">收款比例</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">收款金流</th>
-				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">最後修改</th>
+				<th class="text-center text-nowrap" style="width:6%;padding: 10px;background-color: #CBF3FC;">ERP專案代號</th>
+				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">棟別／樓層</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">預計收款</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">實際收款</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">未收金額</th>
+				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">樓層金流</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">最後修改</th>
 			</tr>
 		</thead>
 		<tbody class="table-group-divider">
 			<tr>
-				<td colspan="19" class="dataTables_empty">資料載入中...</td>
+				<td colspan="15" class="dataTables_empty">資料載入中...</td>
 			</tr>
 		</tbody>
 	</table>
@@ -425,7 +434,7 @@ $list_view
 			"pagingType": "full_numbers",  //分页样式： simple,simple_numbers,full,full_numbers
 			"searching": true,  //禁用原生搜索
 			"ordering": false,
-			"ajaxSource": "/smarty/templates/$site_db/$templates/sub_modal/project/func07/CashflowGC_ms/server_CashflowGC.php?site_db=$site_db&fm=$fm",
+			"ajaxSource": "/smarty/templates/$site_db/$templates/sub_modal/project/func07/FloorCashflowGC_ms/server_FloorCashflowGC.php?site_db=$site_db&fm=$fm",
 			"language": {
 						"sUrl": "$dataTable_de"
 						/*"sUrl": '//cdn.datatables.net/plug-ins/1.12.1/i18n/zh-HANT.json'*/
@@ -433,162 +442,41 @@ $list_view
 			"fixedHeader": true,
 			"fixedColumns": {left:fixedLeftCount },
 			"fnRowCallback": function( nRow, aData, iDisplayIndex ) { 
+				var showText = function(index) {
+					return (aData[index] != null && aData[index] != "") ? aData[index] : "";
+				};
+				var showAmount = function(index) {
+					var value = parseFloat(aData[index]);
+					return isNaN(value) ? "0" : number_format(Math.round(value));
+				};
 
-				//狀態(1)
-				var status1 = "";
-				if (aData[0] != null && aData[0] != "")
-					status1 = aData[0];
+				$('td:eq(0)', nRow).html('<div class="text-center size12 text-nowrap">'+showText(0)+'</div>');
+				$('td:eq(1)', nRow).html('<div class="text-center size12 text-nowrap">'+showText(1)+'</div>');
+				$('td:eq(2)', nRow).html('<div class="text-center size12 weight text-nowrap">'+showText(2)+'</div>');
+				$('td:eq(3)', nRow).html('<div class="text-center size12">'+showText(3)+'</div>');
+				$('td:eq(4)', nRow).html('<div class="text-center size12 text-nowrap">'+showText(4)+'</div>');
+				$('td:eq(5)', nRow).html('<div class="text-center size12">'+showText(5)+'</div>');
+				$('td:eq(6)', nRow).html('<div class="text-center size12">'+showText(6)+'</div>');
 
-				$('td:eq(0)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+status1+'</div>' );
+				var companyName = showText(8) || showText(7);
+				var companyId = showText(9);
+				$('td:eq(7)', nRow).html('<div class="text-center size12">'+companyName+(companyId ? '<div class="size09">'+companyId+'</div>' : '')+'</div>');
+				$('td:eq(8)', nRow).html('<div class="text-center size12 text-nowrap">'+showText(10)+'</div>');
+				$('td:eq(9)', nRow).html('<div class="text-center size12 text-nowrap"><span class="weight">'+showText(11)+'</span> 棟／<span class="weight">'+showText(12)+'</span> 層</div>');
+				$('td:eq(10)', nRow).html('<div class="text-end size12 text-nowrap">'+showAmount(13)+'</div>');
+				$('td:eq(11)', nRow).html('<div class="text-end size12 text-nowrap blue02">'+showAmount(14)+'</div>');
 
-				//狀態(2)
-				var status2 = "";
-				if (aData[1] != null && aData[1] != "")
-					status2 = aData[1];
+				var outstanding = parseFloat(aData[15]);
+				var outstandingClass = (!isNaN(outstanding) && outstanding > 0) ? 'red weight' : 'blue02';
+				$('td:eq(12)', nRow).html('<div class="text-end size12 text-nowrap '+outstandingClass+'">'+showAmount(15)+'</div>');
 
-				$('td:eq(1)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+status2+'</div>' );
+				var url1 = "openfancybox_edit('/index.php?ch=edit&auto_seq="+showText(16)+"&fm=$fm',1900,'96%','');";
+				var showBtn = '<button type="button" class="btn btn-light btn-sm text-nowrap" onclick="'+url1+'" title="樓層金流"><i class="bi bi-building"></i>&nbsp;樓層金流</button>';
+				$('td:eq(13)', nRow).html('<div class="text-center">'+showBtn+'</div>');
 
-
-				//案件編號
-				var case_id = "";
-				if (aData[3] != null && aData[3] != "")
-					case_id = aData[3];
-
-				$('td:eq(2)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 weight text-nowrap" style="height:auto;min-height:32px;">'+case_id+'</div>' );
-
-				//工程名稱
-				var construction_id = "";
-				if (aData[4] != null && aData[4] != "")
-					construction_id = aData[4];
-
-				$('td:eq(3)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+construction_id+'</div>' );
-
-				//承攬模式
-				var ContractingModel = "";
-				if (aData[21] != null && aData[21] != "")
-					ContractingModel = aData[21];
-
-				$('td:eq(4)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center text-nowrap" style="height:auto;min-height:32px;">'+ContractingModel+'</div>' );
-
-				//上包建商名稱
-				var builder_name = "";
-				if (aData[15] != null && aData[15] != "")
-					builder_name = '<span class="size12 me-1 text-nowrap">'+aData[15]+'</span>';
-
-				var builder_id = "";
-				if (aData[5] != null && aData[5] != "")
-					builder_id = '<span class="size09">'+aData[5]+'</span>';
-
-				$('td:eq(5)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;min-height:32px;">'+builder_name+builder_id+'</div>' );
-
-				//上包營造廠名稱
-				var contractor_name = "";
-				if (aData[16] != null && aData[16] != "")
-					contractor_name = '<span class="size12 me-1 text-nowrap">'+aData[16]+'</span>';
-
-				var contractor_id = "";
-				if (aData[6] != null && aData[6] != "")
-					contractor_id = '<span class="size09">'+aData[6]+'</span>';
-
-				$('td:eq(6)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;min-height:32px;">'+contractor_name+contractor_id+'</div>' );
-
-				//所屬公司
-				var show_company_name = "";
-				if (aData[25] != null && aData[25] != "") {
-					show_company_name = '<span class="size12 me-1 text-nowrap">'+aData[25]+'</span>';
-				} else {
-					if (aData[24] != null && aData[24] != "")
-						show_company_name = '<span class="size12 me-1 text-nowrap">'+aData[24]+'</span>';
-				}
-
-				var company_id = "";
-				if (aData[23] != null && aData[23] != "")
-					company_id = '<span class="size09">'+aData[23]+'</span>';
-
-				$('td:eq(7)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;min-height:32px;">'+show_company_name+company_id+'</div>' );
-
-				//合約號碼(ERP專案代號)
-				var ERP_no = "";
-				if (aData[22] != null && aData[22] != "")
-					ERP_no = aData[22];
-
-				$('td:eq(8)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+ERP_no+'</div>' );
-
-				//合約承攬建物棟數
-				var buildings_contract2 = "";
-				if (aData[2] != null && aData[2] != "")
-					buildings_contract2 = aData[2];
-
-				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+buildings_contract2+'</div>' );
-
-				//簽約日期
-				var contract_date = "";
-				if (aData[26] != null && aData[26] != "")
-					contract_date = aData[26];
-
-				$('td:eq(10)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+contract_date+'</div>' );
-
-				//合約簽約金額  合約總價(含稅)
-				var total_contract_amt = "";
-				if (aData[27] != null && aData[27] != "" && aData[27] != 0)
-					total_contract_amt = number_format(aData[27]);
-
-				$('td:eq(11)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+total_contract_amt+'</div>' );
-
-				//預計進場時間
-				var estimated_arrival_date = "";
-				if (aData[28] != null && aData[28] != "" && aData[28] != "0000-00-00")
-					estimated_arrival_date = aData[28];
-
-				$('td:eq(12)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+estimated_arrival_date+'</div>' );
-
-				//預計完工時間
-				var completion_date = "";
-				if (aData[29] != null && aData[29] != "" && aData[29] != "0000-00-00")
-					completion_date = aData[29];
-
-				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+completion_date+'</div>' );
-
-				//實際進場時間
-				var actual_entry_date = "";
-				if (aData[30] != null && aData[30] != "" && aData[30] != "0000-00-00")
-					actual_entry_date = aData[30];
-
-				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+actual_entry_date+'</div>' );
-
-				//實際完工時間
-				var actual_completion_date = "";
-				if (aData[31] != null && aData[31] != "" && aData[31] != "0000-00-00")
-					actual_completion_date = aData[31];
-
-				$('td:eq(15)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+actual_completion_date+'</div>' );
-
-				//收款比例
-				var collection_ratio = "";
-				if (aData[32] != null && aData[32] != "" && aData[31] != 0)
-					collection_ratio = aData[32];
-
-				$('td:eq(16)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center size12 text-nowrap" style="height:auto;min-height:32px;">'+collection_ratio+'</div>' );
-
-
-				var url1 = "openfancybox_edit('/index.php?ch=edit&auto_seq="+aData[14]+"&fm=$fm',1900,'96%','');";
-
-				var show_btn = '';
-					show_btn = '<button type="button" class="btn btn-light btn-sm text-nowrap" onclick="'+url1+'" title="收款金流"><i class="bi bi-building"></i>&nbsp;收款金流</button>';
-
-				$('td:eq(17)', nRow).html( '<div class="d-flex justify-content-center align-items-center text-center" style="height:auto;min-height:32px;">'+show_btn+'</div>' );
-
-				//最後修改
-				var last_modify = "";
-				if (aData[9] != null && aData[9] != "")
-					last_modify = '<div class="text-nowrap">'+moment(aData[9]).format('YYYY-MM-DD HH:mm')+'</div>';
-				
-				//編輯人員
-				var member_name = "";
-				if (aData[17] != null && aData[17] != "")
-					member_name = '<div class="text-nowrap">'+aData[17]+'</div>';
-
-				$('td:eq(18)', nRow).html( '<div class="text-center" style="height:auto;min-height:32px;">'+last_modify+member_name+'</div>' );
+				var lastModify = showText(18) ? '<div class="text-nowrap">'+moment(showText(18)).format('YYYY-MM-DD HH:mm')+'</div>' : '';
+				var memberName = showText(19) ? '<div class="text-nowrap">'+showText(19)+'</div>' : '';
+				$('td:eq(14)', nRow).html('<div class="text-center size12">'+lastModify+memberName+'</div>');
 
 
 				return nRow;
