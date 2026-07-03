@@ -33,10 +33,7 @@ function processform($aFormValues){
 	$second_actual_billing_date			= trim($aFormValues['second_actual_billing_date']);
 	$second_layout_actual_billing_date	= trim($aFormValues['second_layout_actual_billing_date']);
 	$project_progress					= trim($aFormValues['project_progress']);
-	$first_actual_collection_amount		= trim($aFormValues['first_actual_collection_amount']);
-	$first_layout_actual_collection_amount	= trim($aFormValues['first_layout_actual_collection_amount']);
-	$second_actual_collection_amount	= trim($aFormValues['second_actual_collection_amount']);
-	$second_layout_actual_collection_amount	= trim($aFormValues['second_layout_actual_collection_amount']);
+	$completed_qty						= normalize_amount_for_sql($aFormValues['completed_qty']);
 	$first_actual_collection_date		= trim($aFormValues['first_actual_collection_date']);
 	$first_layout_actual_collection_date	= trim($aFormValues['first_layout_actual_collection_date']);
 	$second_actual_collection_date		= trim($aFormValues['second_actual_collection_date']);
@@ -57,6 +54,15 @@ function processform($aFormValues){
 	//存入實體資料庫中
 	$mDB = "";
 	$mDB = new MywebDB();
+
+	$actual_collection_result = calculate_actual_collection_amounts($mDB, $auto_seq, floatval($completed_qty));
+	if (!$actual_collection_result['ok']) {
+		$mDB->remove();
+		$error_message = addslashes($actual_collection_result['message']);
+		$objResponse->script("jAlert('警示', '$error_message', 'red', '', 2500);");
+		return $objResponse;
+	}
+
 	updateFloorCashflowGCModifyLogByDetailSeq($mDB, $auto_seq, $memberID);
 
 	$expected_collection_update_sql = calculate_manual_expected_collection_update_sql(
@@ -72,10 +78,12 @@ function processform($aFormValues){
 			,second_actual_billing_date	= '$second_actual_billing_date'
 			,second_layout_actual_billing_date	= '$second_layout_actual_billing_date'
 			,project_progress	= '$project_progress'
-			,first_actual_collection_amount	= '$first_actual_collection_amount'
-			,first_layout_actual_collection_amount	= '$first_layout_actual_collection_amount'
-			,second_actual_collection_amount	= '$second_actual_collection_amount'
-			,second_layout_actual_collection_amount	= '$second_layout_actual_collection_amount'
+			,completed_qty	= $completed_qty
+			,actual_collection_amount	= ".$actual_collection_result['total_amount']."
+			,first_actual_collection_amount	= ".$actual_collection_result['parts'][0]."
+			,first_layout_actual_collection_amount	= ".$actual_collection_result['parts'][1]."
+			,second_actual_collection_amount	= ".$actual_collection_result['parts'][2]."
+			,second_layout_actual_collection_amount	= ".$actual_collection_result['parts'][3]."
 			,first_actual_collection_date	= '$first_actual_collection_date'
 			,first_layout_actual_collection_date	= '$first_layout_actual_collection_date'
 			,second_actual_collection_date	= '$second_actual_collection_date'
@@ -108,6 +116,145 @@ function normalize_amount_for_sql($value) {
 		return "0";
 	}
 	return (string)floatval($value);
+}
+
+/**
+ * 依樓層類型取得放樣單價，乘上計價施作數量及案件稅率後，再按預計收款四階段比例分配。
+ */
+function calculate_actual_collection_amounts($mDB, $auto_seq, $completed_qty) {
+	$auto_seq_sql = addslashes($auto_seq);
+	$Qry="SELECT
+			 a.floor,
+			 a.first_expected_collection_amount,
+			 a.first_layout_expected_collection_amount,
+			 a.second_expected_collection_amount,
+			 a.second_layout_expected_collection_amount,
+			 b.std_layer_floor,
+			 b.roof_protrusion_floor,
+			 c.layout_std_floor_u_price,
+			 c.square_roof_protrusion_u_price,
+			 c.tax_excluded
+		FROM buildings_sub_detail a
+		LEFT JOIN buildings_sub b ON b.case_id = a.case_id AND b.building = a.building
+		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
+		WHERE a.auto_seq = '$auto_seq_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return array('ok' => false, 'message' => '找不到樓層資料，無法計算實際收款金額。');
+	}
+
+	$row = $mDB->fetchRow(2);
+	$floor_key = actual_collection_floor_key($row['floor']);
+	$std_floors = actual_collection_floor_range_list($row['std_layer_floor']);
+	$roof_floors = actual_collection_floor_range_list($row['roof_protrusion_floor']);
+
+	if ($floor_key != "" && isset($std_floors[$floor_key])) {
+		$layout_unit_price = floatval($row['layout_std_floor_u_price']);
+	} else if ($floor_key != "" && isset($roof_floors[$floor_key])) {
+		$layout_unit_price = floatval($row['square_roof_protrusion_u_price']);
+	} else {
+		return array('ok' => false, 'message' => '此樓層不在標準層或屋突層設定範圍內，無法判斷放樣單價。');
+	}
+
+	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
+	$total_amount = round($layout_unit_price * max(0, floatval($completed_qty)) * $tax_multiplier, 2);
+	$weights = array(
+		floatval($row['first_expected_collection_amount']),
+		floatval($row['first_layout_expected_collection_amount']),
+		floatval($row['second_expected_collection_amount']),
+		floatval($row['second_layout_expected_collection_amount'])
+	);
+	$total_weight = array_sum($weights);
+	if ($total_weight <= 0 && $total_amount != 0) {
+		return array('ok' => false, 'message' => '預計收款金額尚未設定，無法取得實際收款的分配比例。');
+	}
+
+	$parts = array(0, 0, 0, 0);
+	$allocated_amount = 0;
+	if ($total_weight > 0) {
+		for ($i = 0; $i < count($weights); $i++) {
+			if ($i == count($weights) - 1) {
+				$parts[$i] = round($total_amount - $allocated_amount, 2);
+			} else {
+				$parts[$i] = round($total_amount * ($weights[$i] / $total_weight), 2);
+				$allocated_amount += $parts[$i];
+			}
+		}
+	}
+
+	return array(
+		'ok' => true,
+		'total_amount' => number_format($total_amount, 2, '.', ''),
+		'parts' => array(
+			number_format($parts[0], 2, '.', ''),
+			number_format($parts[1], 2, '.', ''),
+			number_format($parts[2], 2, '.', ''),
+			number_format($parts[3], 2, '.', '')
+		)
+	);
+}
+
+/**
+ * 判斷案件的稅別欄位是否代表未稅；未稅時實際收款金額需加計 5% 稅額。
+ */
+function actual_collection_is_tax_excluded($value) {
+	$value = strtoupper(trim((string)$value));
+	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
+}
+
+function actual_collection_floor_range_list($floor_text) {
+	$result = array();
+	$floor_text = trim((string)$floor_text);
+	if ($floor_text == "") {
+		return $result;
+	}
+
+	$floor_text = str_replace(array("，","、","；",";","~","～","－","—","至","到"), array(",",",",",",",","-","-","-","-","-","-"), $floor_text);
+	$floor_text = str_replace(" ", "", $floor_text);
+	$parts = preg_split("/,+/", $floor_text);
+	for ($i = 0; $i < count($parts); $i++) {
+		$part = trim($parts[$i]);
+		if ($part == "") {
+			continue;
+		}
+		if (strpos($part, "-") !== false) {
+			$range_parts = explode("-", $part);
+			if (count($range_parts) != 2) {
+				return array();
+			}
+			$start = actual_collection_floor_code($range_parts[0]);
+			$end = actual_collection_floor_code($range_parts[1]);
+			if ($start === false || $end === false || $start['prefix'] != $end['prefix']) {
+				return array();
+			}
+			for ($floor_no = min($start['number'], $end['number']); $floor_no <= max($start['number'], $end['number']); $floor_no++) {
+				$result[$start['prefix'].":".$floor_no] = true;
+			}
+		} else {
+			$single = actual_collection_floor_code($part);
+			if ($single === false) {
+				return array();
+			}
+			$result[$single['prefix'].":".$single['number']] = true;
+		}
+	}
+	return $result;
+}
+
+function actual_collection_floor_key($floor_text) {
+	$floor = actual_collection_floor_code($floor_text);
+	return ($floor === false) ? "" : $floor['prefix'].":".$floor['number'];
+}
+
+function actual_collection_floor_code($floor_text) {
+	$floor_text = strtoupper(str_replace(" ", "", trim((string)$floor_text)));
+	if (preg_match("/^(R|B)?([0-9]+)F?$/", $floor_text, $matches)) {
+		return array(
+			'prefix' => ($matches[1] == "") ? "N" : $matches[1],
+			'number' => intval($matches[2])
+		);
+	}
+	return false;
 }
 
 function calculate_manual_expected_collection_update_sql($mDB, $auto_seq, $new_retention_amount, $new_advance_payment_amount) {
@@ -203,9 +350,8 @@ $second_layout_actual_collection_date = "";
 $payment_request_stage = "";
 $remark = "";
 
-$Qry="SELECT a.*,b.completed_qty
+$Qry="SELECT a.*
 FROM buildings_sub_detail a
-LEFT JOIN pjprogress_sub b ON b.case_id = a.case_id AND b.building = a.building AND b.floor = a.floor
 WHERE a.auto_seq = '$auto_seq'";
 $mDB->query($Qry);
 
@@ -273,8 +419,8 @@ $show_second_layout_expected_collection_amount = ($second_layout_expected_collec
 $show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
 $show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
 $show_expected_collection_amount = "
-	<div class=\"summary_line\"><span>第一次占比：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
-	<div class=\"summary_line\"><span>第二次占比：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
+	<div class=\"summary_line\"><span>第一次金額：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
+	<div class=\"summary_line\"><span>第二次金額：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
 ";
 $show_first_expected_collection_date_1 = ($first_expected_collection_date_1 != "" && $first_expected_collection_date_1 != "0000-00-00") ? $first_expected_collection_date_1 : "";
 $show_first_expected_collection_date_2 = ($first_expected_collection_date_2 != "" && $first_expected_collection_date_2 != "0000-00-00") ? $first_expected_collection_date_2 : "";
@@ -305,20 +451,38 @@ function build_actual_date_input($field_name, $field_value) {
 
 $show_actual_billing_date_inputs = "
 	<div class=\"actual_grid\">
-		<div><div class=\"actual_label\">第一次占比</div>".build_actual_date_input("first_actual_billing_date", $first_actual_billing_date)."</div>
+		<div><div class=\"actual_label\">第一次日期</div>".build_actual_date_input("first_actual_billing_date", $first_actual_billing_date)."</div>
 		<div><div class=\"actual_label\">第一次放樣</div>".build_actual_date_input("first_layout_actual_billing_date", $first_layout_actual_billing_date)."</div>
-		<div><div class=\"actual_label\">第二次占比</div>".build_actual_date_input("second_actual_billing_date", $second_actual_billing_date)."</div>
+		<div><div class=\"actual_label\">第二次日期</div>".build_actual_date_input("second_actual_billing_date", $second_actual_billing_date)."</div>
 		<div><div class=\"actual_label\">第二次放樣</div>".build_actual_date_input("second_layout_actual_billing_date", $second_layout_actual_billing_date)."</div>
 	</div>
 ";
 
+$show_first_actual_collection_amount = number_format(floatval($first_actual_collection_amount), 2);
+$show_first_layout_actual_collection_amount = number_format(floatval($first_layout_actual_collection_amount), 2);
+$show_second_actual_collection_amount = number_format(floatval($second_actual_collection_amount), 2);
+$show_second_layout_actual_collection_amount = number_format(floatval($second_layout_actual_collection_amount), 2);
+
 $show_actual_collection_amount_inputs = "
-	<div class=\"actual_grid\">
-		<div><div class=\"actual_label\">第一次占比</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_actual_collection_amount\" value=\"$first_actual_collection_amount\" onchange=\"setEdit();\"></div>
-		<div><div class=\"actual_label\">第一次放樣</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_layout_actual_collection_amount\" value=\"$first_layout_actual_collection_amount\" onchange=\"setEdit();\"></div>
-		<div><div class=\"actual_label\">第二次占比</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_actual_collection_amount\" value=\"$second_actual_collection_amount\" onchange=\"setEdit();\"></div>
-		<div><div class=\"actual_label\">第二次放樣</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_layout_actual_collection_amount\" value=\"$second_layout_actual_collection_amount\" onchange=\"setEdit();\"></div>
+	<div class=\"actual_amount_grid\">
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第一次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong>$show_first_actual_collection_amount</strong></div>
+		</div>
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第一次放樣</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong>$show_first_layout_actual_collection_amount</strong></div>
+		</div>
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第二次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong>$show_second_actual_collection_amount</strong></div>
+		</div>
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第二次放樣</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong>$show_second_layout_actual_collection_amount</strong></div>
+		</div>
 	</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依放樣單價、計價(施作)數量及預計收款比例自動計算。</div>
 ";
 
 $show_deduction_amount_inputs = "
@@ -330,10 +494,10 @@ $show_deduction_amount_inputs = "
 
 $show_actual_collection_date_inputs = "
 	<div class=\"actual_grid\">
-		<div><div class=\"actual_label\">第一次占比</div>".build_actual_date_input("first_actual_collection_date", $first_actual_collection_date)."</div>
-		<div><div class=\"actual_label\">第一次放樣</div>".build_actual_date_input("first_layout_actual_collection_date", $first_layout_actual_collection_date)."</div>
-		<div><div class=\"actual_label\">第二次占比</div>".build_actual_date_input("second_actual_collection_date", $second_actual_collection_date)."</div>
-		<div><div class=\"actual_label\">第二次放樣</div>".build_actual_date_input("second_layout_actual_collection_date", $second_layout_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第一次之一</div>".build_actual_date_input("first_actual_collection_date", $first_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第一次之二</div>".build_actual_date_input("first_layout_actual_collection_date", $first_layout_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第二次之一</div>".build_actual_date_input("second_actual_collection_date", $second_actual_collection_date)."</div>
+		<div><div class=\"actual_label\">第二次之二</div>".build_actual_date_input("second_layout_actual_collection_date", $second_layout_actual_collection_date)."</div>
 	</div>
 ";
 
@@ -567,6 +731,71 @@ $style_css=<<<EOT
 	max-width: 200px;
 }
 
+.actual_amount_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+.actual_amount_card {
+	padding: 10px 12px;
+	border: 1px solid #d8e2ea;
+	border-radius: 8px;
+	background-color: #fff;
+}
+
+.actual_amount_card_header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+	color: #475569;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.amount_lock {
+	flex: 0 0 auto;
+	color: #64748b;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.amount_lock i {
+	font-size: 12px;
+}
+
+.actual_amount_value {
+	display: flex;
+	align-items: baseline;
+	justify-content: flex-end;
+	gap: 6px;
+	color: #0b5f75;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.actual_amount_value .currency {
+	color: #64748b;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.actual_amount_value strong {
+	font-size: 18px;
+	line-height: 1.2;
+	letter-spacing: .2px;
+}
+
+.actual_amount_hint {
+	margin-top: 10px;
+	color: #64748b;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.5;
+}
+
 </style>
 
 EOT;
@@ -743,6 +972,71 @@ $style_css=<<<EOT
 	width: 100%;
 }
 
+.actual_amount_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
+}
+
+.actual_amount_card {
+	padding: 10px 12px;
+	border: 1px solid #d8e2ea;
+	border-radius: 8px;
+	background-color: #fff;
+}
+
+.actual_amount_card_header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+	color: #475569;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.amount_lock {
+	flex: 0 0 auto;
+	color: #64748b;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.amount_lock i {
+	font-size: 12px;
+}
+
+.actual_amount_value {
+	display: flex;
+	align-items: baseline;
+	justify-content: flex-end;
+	gap: 6px;
+	color: #0b5f75;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.actual_amount_value .currency {
+	color: #64748b;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.actual_amount_value strong {
+	font-size: 18px;
+	line-height: 1.2;
+	letter-spacing: .2px;
+}
+
+.actual_amount_hint {
+	margin-top: 12px;
+	color: #64748b;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.5;
+}
+
 </style>
 EOT;
 
@@ -810,7 +1104,7 @@ $style_css
 							</div>
 							<div class="readonly_item">
 								<div class="field_label">計價(施作)數量</div>
-								<div class="field_value">$completed_qty</div>
+								<input type="number" class="form-control" name="completed_qty" value="$completed_qty" min="0" step="0.01" onchange="setEdit();" />
 							</div>
 						</div>
 					</div>

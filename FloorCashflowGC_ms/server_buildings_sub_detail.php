@@ -14,7 +14,7 @@
 	/* Array of database columns which should be read and sent back to DataTables. Use a space where
 	 * you want to insert a non-database field (for example a counter or static image)
 	 */
-	$aColumns = array( 'a.floor','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.first_expected_work_qty','a.first_layout_expected_work_qty','a.second_expected_work_qty','a.second_layout_expected_work_qty','a.first_expected_collection_amount','a.first_layout_expected_collection_amount','a.second_expected_collection_amount','a.second_layout_expected_collection_amount','a.retention_deduction_amount','a.advance_payment_deduction_amount','a.first_expected_collection_date_1','a.first_expected_collection_date_2','a.second_expected_collection_date_1','a.second_expected_collection_date_2','a.actual_submission_date','a.actual_grouting_date','a.actual_billing_date','a.first_actual_billing_date','a.first_layout_actual_billing_date','a.second_actual_billing_date','a.second_layout_actual_billing_date','a.project_progress','b.completed_qty','a.actual_collection_amount','a.first_actual_collection_amount','a.first_layout_actual_collection_amount','a.second_actual_collection_amount','a.second_layout_actual_collection_amount','a.actual_collection_date','a.first_actual_collection_date','a.first_layout_actual_collection_date','a.second_actual_collection_date','a.second_layout_actual_collection_date','a.payment_request_stage','a.remark','a.auto_seq');
+	$aColumns = array( 'a.floor','a.expected_actual_delivery_date','a.expected_actual_grouting_date','a.first_expected_work_qty','a.first_layout_expected_work_qty','a.second_expected_work_qty','a.second_layout_expected_work_qty','a.first_expected_collection_amount','a.first_layout_expected_collection_amount','a.second_expected_collection_amount','a.second_layout_expected_collection_amount','a.retention_deduction_amount','a.advance_payment_deduction_amount','a.first_expected_collection_date_1','a.first_expected_collection_date_2','a.second_expected_collection_date_1','a.second_expected_collection_date_2','a.actual_submission_date','a.actual_grouting_date','a.actual_billing_date','a.first_actual_billing_date','a.first_layout_actual_billing_date','a.second_actual_billing_date','a.second_layout_actual_billing_date','a.project_progress','a.completed_qty','a.actual_collection_amount','a.first_actual_collection_amount','a.first_layout_actual_collection_amount','a.second_actual_collection_amount','a.second_layout_actual_collection_amount','a.actual_collection_date','a.first_actual_collection_date','a.first_layout_actual_collection_date','a.second_actual_collection_date','a.second_layout_actual_collection_date','a.payment_request_stage','a.remark','a.auto_seq');
 	
 	/* Indexed column (used for fast and accurate table cardinality) */
 	$sIndexColumn = "auto_seq";
@@ -136,7 +136,6 @@
 	$sQuery = "
 		SELECT SQL_CALC_FOUND_ROWS ".str_replace(" , ", " ", implode(", ", $aColumns))."
 		FROM   $sTable a
-		LEFT JOIN pjprogress_sub b ON b.case_id = a.case_id AND b.building = a.building AND b.floor = a.floor
 		$sWhere
 		$sOrder
 		$sLimit

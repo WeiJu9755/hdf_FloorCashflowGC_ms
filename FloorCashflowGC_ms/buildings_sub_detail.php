@@ -79,7 +79,7 @@ $list_view=<<<EOT
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">樓層</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>交版日期</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計+實際<br>灌漿日期</th>
-							<th scope="col" class="text-center text-nowrap vmiddle" style="width:10%;">施作數量</th>
+							<th scope="col" class="text-center text-nowrap vmiddle" style="width:10%;">預計施作數量</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">預計<br>收款金額</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>保留/租賃預收差款</th>
 							<th scope="col" class="text-center text-nowrap vmiddle" style="width:5%;">扣抵<br>預收款</th>
@@ -238,8 +238,8 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
 					return '<div class="work-qty-box">'
-						+'<div class="work-qty-line"><span class="work-qty-label">第一次占比：</span><span class="work-qty-value first-stage-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="work-qty-line"><span class="work-qty-label">第二次占比：</span><span class="work-qty-value second-stage-value">'+values[2]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第二次放樣：</span><span class="work-qty-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="work-qty-line"><span class="work-qty-label">第一次數量：</span><span class="work-qty-value first-stage-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="work-qty-line"><span class="work-qty-label">第二次數量：</span><span class="work-qty-value second-stage-value">'+values[2]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第二次放樣：</span><span class="work-qty-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -252,8 +252,8 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次金額：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次金額：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -271,7 +271,7 @@ $list_view
 						+'</div>';
 				}
 
-				function showFourStageDate(idx) {
+				function showBillingDate(idx) {
 					var values = showText(idx).split('||');
 					while (values.length < 4) {
 						values.push('');
@@ -280,8 +280,22 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != '0000-00-00') ? values[i] : '';
 					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次占比：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次占比：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次日期：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次日期：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'</div>';
+				}
+
+				function showActualCollectionDate(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != '0000-00-00') ? values[i] : '';
+					}
+					return '<div class="collection-amount-box">'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次之一：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次之二：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -336,7 +350,7 @@ $list_view
 				$('td:eq(9)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_grouting_date+'</div>' );
 
 				//實際計價日
-				var actual_billing_date = showFourStageDate(10);
+				var actual_billing_date = showBillingDate(10);
 
 				$('td:eq(10)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_billing_date+'</div>' );
 
@@ -356,7 +370,7 @@ $list_view
 				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_amount+'</div>' );
 
 				//實際收款日
-				var actual_collection_date = showFourStageDate(14);
+				var actual_collection_date = showActualCollectionDate(14);
 
 				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_date+'</div>' );
 
