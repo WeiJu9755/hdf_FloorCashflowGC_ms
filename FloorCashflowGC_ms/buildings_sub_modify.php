@@ -36,15 +36,32 @@ function processform($aFormValues){
 		$fm								= trim($aFormValues['fm']);
 		$auto_seq						= trim($aFormValues['auto_seq']);
 		$memberID						= trim($aFormValues['memberID']);
-		$std_layer_qty					= trim($aFormValues['std_layer_qty']);
-		$roof_protrusion_qty			= trim($aFormValues['roof_protrusion_qty']);
-		$layout_std_layer_qty			= trim($aFormValues['layout_std_layer_qty']);
-		$layout_roof_protrusion_qty		= trim($aFormValues['layout_roof_protrusion_qty']);
-
-		
 		//存入實體資料庫中
 		$mDB = "";
 		$mDB = new MywebDB();
+
+		// 數量以 CaseManagement 為唯一來源，避免唯讀欄位遭前端竄改。
+		$auto_seq_sql = addslashes($auto_seq);
+		$Qry="SELECT cm.tot_std_contract_layers,
+					cm.tot_houses_multi_floors,
+					cm.layout_std_floor_total_qty,
+					cm.layout_roof_protrusion_total_qty
+			  FROM buildings_sub bs
+			  INNER JOIN CaseManagement cm ON cm.case_id = bs.case_id
+			 WHERE bs.auto_seq = '$auto_seq_sql'
+			 LIMIT 1";
+		$mDB->query($Qry);
+		if ($mDB->rowCount() == 0) {
+			$mDB->remove();
+			$objResponse->script("jAlert('警示', '找不到案件數量資料，無法更新。', 'red', '', 2000);");
+			return $objResponse;
+		}
+		$case_qty_row = $mDB->fetchRow(2);
+		$std_layer_qty = addslashes($case_qty_row['tot_std_contract_layers']);
+		$roof_protrusion_qty = addslashes($case_qty_row['tot_houses_multi_floors']);
+		$layout_std_layer_qty = addslashes($case_qty_row['layout_std_floor_total_qty']);
+		$layout_roof_protrusion_qty = addslashes($case_qty_row['layout_roof_protrusion_total_qty']);
+
 		updateFloorCashflowGCModifyLogByBuildingSeq($mDB, $auto_seq, $memberID);
 	  
 		$Qry="UPDATE buildings_sub set
@@ -121,6 +138,39 @@ if ($mDB->rowCount() > 0) {
 	$layout_std_layer_qty = $row['layout_std_layer_qty'];
 	$layout_roof_protrusion_qty = $row['layout_roof_protrusion_qty'];
 	$outsourcing = $row['outsourcing'];
+}
+
+// 開啟編輯頁時，自動以 CaseManagement 的合約／放樣總數量同步本棟資料。
+if (!empty($case_id)) {
+	$case_id_sql = addslashes($case_id);
+	$Qry="SELECT tot_std_contract_layers,
+				tot_houses_multi_floors,
+				layout_std_floor_total_qty,
+				layout_roof_protrusion_total_qty
+			  FROM CaseManagement
+			 WHERE case_id = '$case_id_sql'
+			 LIMIT 1";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() > 0) {
+		$case_qty_row = $mDB->fetchRow(2);
+		$std_layer_qty = $case_qty_row['tot_std_contract_layers'];
+		$roof_protrusion_qty = $case_qty_row['tot_houses_multi_floors'];
+		$layout_std_layer_qty = $case_qty_row['layout_std_floor_total_qty'];
+		$layout_roof_protrusion_qty = $case_qty_row['layout_roof_protrusion_total_qty'];
+
+		$std_layer_qty_sql = addslashes($std_layer_qty);
+		$roof_protrusion_qty_sql = addslashes($roof_protrusion_qty);
+		$layout_std_layer_qty_sql = addslashes($layout_std_layer_qty);
+		$layout_roof_protrusion_qty_sql = addslashes($layout_roof_protrusion_qty);
+		$auto_seq_sql = addslashes($auto_seq);
+		$Qry="UPDATE buildings_sub SET
+				 std_layer_qty = '$std_layer_qty_sql'
+				,roof_protrusion_qty = '$roof_protrusion_qty_sql'
+				,layout_std_layer_qty = '$layout_std_layer_qty_sql'
+				,layout_roof_protrusion_qty = '$layout_roof_protrusion_qty_sql'
+			  WHERE auto_seq = '$auto_seq_sql'";
+		$mDB->query($Qry);
+	}
 }
 
 $mDB->remove();
@@ -371,19 +421,19 @@ $style_css
 						<div class="edit_grid">
 							<div class="edit_item">
 								<div class="field_label">標準層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="std_layer_qty" name="std_layer_qty" size="20" value="$std_layer_qty" onchange="setEdit();"/>
+								<input type="text" class="inputtext qty_input" id="std_layer_qty" name="std_layer_qty" size="20" value="$std_layer_qty" readonly/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label">屋突層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" value="$roof_protrusion_qty" onchange="setEdit();"/>
+								<input type="text" class="inputtext qty_input" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" value="$roof_protrusion_qty" readonly/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label"><span class="label_highlight">放樣</span>標準層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" value="$layout_std_layer_qty" onchange="setEdit();"/>
+								<input type="text" class="inputtext qty_input" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" value="$layout_std_layer_qty" readonly/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label"><span class="label_highlight">放樣</span>屋突層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" value="$layout_roof_protrusion_qty" onchange="setEdit();"/>
+								<input type="text" class="inputtext qty_input" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" value="$layout_roof_protrusion_qty" readonly/>
 							</div>
 						</div>
 					</div>
