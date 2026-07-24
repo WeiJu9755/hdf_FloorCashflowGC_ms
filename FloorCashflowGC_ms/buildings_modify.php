@@ -221,8 +221,6 @@ function apply_expected_work_qty($case_id,$memberID){
 			$first_layout_expected_collection_amount = "NULL";
 			$second_expected_collection_amount = "NULL";
 			$second_layout_expected_collection_amount = "NULL";
-			$retention_deduction_amount = "NULL";
-			$advance_payment_deduction_amount = "NULL";
 			$first_expected_collection_date_1 = "NULL";
 			$first_expected_collection_date_2 = "NULL";
 			$second_expected_collection_date_1 = "NULL";
@@ -247,24 +245,15 @@ function apply_expected_work_qty($case_id,$memberID){
 			$second_expected_work_qty = round($work_qty * $second_rate, 2);
 			$second_layout_expected_work_qty = round($layout_work_qty * $second_rate, 2);
 
-			$base_collection_amount = round((($unit_price * $work_qty) + ($layout_unit_price * $layout_work_qty)) * $tax_multiplier, 2);
-			$retention_deduction_amount = round($base_collection_amount * $retention_rate, 2);
-			$advance_payment_deduction_amount = round($base_collection_amount * $advance_payment_rate, 2);
-			$net_collection_amount = $base_collection_amount - $retention_deduction_amount - $advance_payment_deduction_amount;
+			$first_base_collection_amount = $first_expected_work_qty * $unit_price * $tax_multiplier;
+			$first_layout_base_collection_amount = $first_layout_expected_work_qty * $layout_unit_price * $tax_multiplier;
+			$second_base_collection_amount = $second_expected_work_qty * $unit_price * $tax_multiplier;
+			$second_layout_base_collection_amount = $second_layout_expected_work_qty * $layout_unit_price * $tax_multiplier;
 
-			$collection_parts = allocate_expected_collection_amounts(
-				$net_collection_amount,
-				array(
-					$unit_price * $work_qty * $first_rate,
-					$layout_unit_price * $layout_work_qty * $first_rate,
-					$unit_price * $work_qty * $second_rate,
-					$layout_unit_price * $layout_work_qty * $second_rate
-				)
-			);
-			$first_expected_collection_amount = $collection_parts[0];
-			$first_layout_expected_collection_amount = $collection_parts[1];
-			$second_expected_collection_amount = $collection_parts[2];
-			$second_layout_expected_collection_amount = $collection_parts[3];
+			$first_expected_collection_amount = calculate_expected_collection_amount($first_base_collection_amount, $retention_rate, $advance_payment_rate);
+			$first_layout_expected_collection_amount = calculate_expected_collection_amount($first_layout_base_collection_amount, $retention_rate, $advance_payment_rate);
+			$second_expected_collection_amount = calculate_expected_collection_amount($second_base_collection_amount, $retention_rate, $advance_payment_rate);
+			$second_layout_expected_collection_amount = calculate_expected_collection_amount($second_layout_base_collection_amount, $retention_rate, $advance_payment_rate);
 
 			$next_expected_actual_grouting_date = "";
 			if (isset($details[$j + 1])) {
@@ -296,8 +285,6 @@ function apply_expected_work_qty($case_id,$memberID){
 				,first_layout_expected_collection_amount = $first_layout_expected_collection_amount
 				,second_expected_collection_amount = $second_expected_collection_amount
 				,second_layout_expected_collection_amount = $second_layout_expected_collection_amount
-				,retention_deduction_amount = $retention_deduction_amount
-				,advance_payment_deduction_amount = $advance_payment_deduction_amount
 				,first_expected_collection_date_1 = $first_expected_collection_date_1
 				,first_expected_collection_date_2 = $first_expected_collection_date_2
 				,second_expected_collection_date_1 = $second_expected_collection_date_1
@@ -327,14 +314,6 @@ function apply_expected_work_qty($case_id,$memberID){
 	$objResponse->script("art.dialog.tips('".$tip_text."',2);");
 
 	return $objResponse;
-}
-
-/**
- * 判斷案件的稅別欄位是否代表未稅，未稅時預計金額需乘上稅率。
- */
-function is_tax_excluded_checked($value) {
-	$value = strtoupper(trim((string)$value));
-	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
 }
 
 /**
@@ -370,31 +349,23 @@ function get_case_percentage_sum($mDB, $table_name, $case_id_sql) {
 }
 
 /**
- * 將扣抵後的預計收款淨額依四個原始權重分配，並用最後一格吸收四捨五入差額。
+ * 判斷案件的稅別欄位是否代表未稅，未稅時預計金額需乘上稅率。
  */
-function allocate_expected_collection_amounts($net_amount, $weights) {
-	$total_weight = 0;
-	for ($i = 0; $i < count($weights); $i++) {
-		$weights[$i] = floatval($weights[$i]);
-		$total_weight += $weights[$i];
+function is_tax_excluded_checked($value) {
+	$value = strtoupper(trim((string)$value));
+	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
+}
+
+/**
+ * 依預計施作金額分別扣除保留款總%與預收款總%，計算單一階段預計收款金額。
+ */
+function calculate_expected_collection_amount($base_amount, $retention_rate, $advance_payment_rate) {
+	$base_amount = floatval($base_amount);
+	if ($base_amount == 0) {
+		return "NULL";
 	}
 
-	if ($total_weight == 0) {
-		return array("NULL", "NULL", "NULL", "NULL");
-	}
-
-	$parts = array();
-	$allocated_amount = 0;
-	for ($i = 0; $i < count($weights); $i++) {
-		if ($i == count($weights) - 1) {
-			$parts[$i] = round($net_amount - $allocated_amount, 2);
-		} else {
-			$parts[$i] = round($net_amount * ($weights[$i] / $total_weight), 2);
-			$allocated_amount += $parts[$i];
-		}
-	}
-
-	return $parts;
+	return round($base_amount - ($base_amount * $retention_rate) - ($base_amount * $advance_payment_rate), 2);
 }
 
 
@@ -454,6 +425,36 @@ function get_day_number($dayText) {
 }
 
 /**
+ * 取得付款日文字指定的樓層日期自動抓取類型。
+ */
+function get_auto_floor_date_day_text_type($dayText) {
+	$normalized_day_text = str_replace(
+		array(" ", "　", "+", "＋", "(", ")", "（", "）", "-", "－"),
+		"",
+		trim((string)$dayText)
+	);
+
+	if (strpos($normalized_day_text, "自動抓取") === false) {
+		return "";
+	}
+	if (strpos($normalized_day_text, "灌漿日") !== false) {
+		return "grouting";
+	}
+	if (strpos($normalized_day_text, "交版日") !== false || strpos($normalized_day_text, "交板日") !== false) {
+		return "delivery";
+	}
+	return "";
+}
+
+/**
+ * 判斷付款日文字是否為月底。
+ */
+function is_month_end_day($dayText) {
+	$dayText = trim((string)$dayText);
+	return ($dayText == "月底" || $dayText == "月末");
+}
+
+/**
  * 依基準日期、截止月份與截止日計算該月的截止日期。
  */
 function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
@@ -474,7 +475,7 @@ function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
 	$year = $date->format("Y");
 	$month = $date->format("m");
 	$lastDay = intval(date("t", strtotime("$year-$month-01")));
-	if ($day > $lastDay) {
+	if (is_month_end_day($deadline) || $day > $lastDay) {
 		$day = $lastDay;
 	}
 
@@ -484,8 +485,22 @@ function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
 /**
  * 依基準日期、付款月份、付款日與加計天數算出預計收款日。
  */
-function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays = 0) {
+function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays = 0, $autoBaseDate = "", $autoDeliveryDate = "", $autoGroutingDate = "") {
 	if (!is_valid_floorcashflow_date($baseDate)) {
+		return "";
+	}
+
+	$auto_day_text_type = get_auto_floor_date_day_text_type($paymentDate);
+	if ($auto_day_text_type != "") {
+		if ($auto_day_text_type == "grouting" && is_valid_floorcashflow_date($autoGroutingDate)) {
+			return substr($autoGroutingDate, 0, 10);
+		}
+		if ($auto_day_text_type == "delivery" && is_valid_floorcashflow_date($autoDeliveryDate)) {
+			return substr($autoDeliveryDate, 0, 10);
+		}
+		if (is_valid_floorcashflow_date($autoBaseDate)) {
+			return substr($autoBaseDate, 0, 10);
+		}
 		return "";
 	}
 
@@ -502,7 +517,7 @@ function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays 
 	$year = $date->format("Y");
 	$month = $date->format("m");
 	$lastDay = intval(date("t", strtotime("$year-$month-01")));
-	if ($day > $lastDay) {
+	if (is_month_end_day($paymentDate) || $day > $lastDay) {
 		$day = $lastDay;
 	}
 
@@ -511,7 +526,7 @@ function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays 
 		$result->modify("+" . intval($paymentDays) . " day");
 	}
 
-	return $result->format("Y-m-d");
+	return move_weekend_to_next_monday($result->format("Y-m-d"));
 }
 
 /**
@@ -528,7 +543,9 @@ function calculate_expected_receiving_payment_date(
 	$deadline_b = "",
 	$payment_months_b = "",
 	$payment_date_b = "",
-	$payment_days_b = 0
+	$payment_days_b = 0,
+	$auto_delivery_date = "",
+	$auto_grouting_date = ""
 ) {
 	if (!is_valid_floorcashflow_date($completion_date)) {
 		return "";
@@ -543,11 +560,11 @@ function calculate_expected_receiving_payment_date(
 	$hasB = (trim((string)$cutoff_month_b) != "" && trim((string)$deadline_b) != "");
 	if (!$hasB) {
 		if ($baseDate <= $cutoffDateA) {
-			return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a);
+			return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a, $completion_date, $auto_delivery_date, $auto_grouting_date);
 		}
 		$nextBaseDate = new DateTime(substr($completion_date, 0, 10));
 		$nextBaseDate->modify("first day of next month");
-		return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a);
+		return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a, $completion_date, $auto_delivery_date, $auto_grouting_date);
 	}
 
 	$cutoffDateB = get_cutoff_date($completion_date, $cutoff_month_b, $deadline_b);
@@ -556,15 +573,15 @@ function calculate_expected_receiving_payment_date(
 	}
 
 	if ($baseDate <= $cutoffDateA) {
-		return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a);
+		return get_payment_date($completion_date, $payment_months_a, $payment_date_a, $payment_days_a, $completion_date, $auto_delivery_date, $auto_grouting_date);
 	}
 	if ($baseDate <= $cutoffDateB) {
-		return get_payment_date($completion_date, $payment_months_b, $payment_date_b, $payment_days_b);
+		return get_payment_date($completion_date, $payment_months_b, $payment_date_b, $payment_days_b, $completion_date, $auto_delivery_date, $auto_grouting_date);
 	}
 
 	$nextBaseDate = new DateTime(substr($completion_date, 0, 10));
 	$nextBaseDate->modify("first day of next month");
-	return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a);
+	return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a, $completion_date, $auto_delivery_date, $auto_grouting_date);
 }
 
 /**
@@ -587,7 +604,7 @@ function normalize_gc_price_base_date($base_date) {
 /**
  * 依欄位前綴與序號讀取 CasePricingGC_sub 設定，計算對應階段的預計收款日。
  */
-function calculate_expected_receiving_payment_date_by_prefix($completion_date, $row, $prefix, $seq) {
+function calculate_expected_receiving_payment_date_by_prefix($completion_date, $row, $prefix, $seq, $auto_delivery_date = "", $auto_grouting_date = "") {
 	$date = calculate_expected_receiving_payment_date(
 		$completion_date,
 		isset($row[$prefix . "_cutoff_month_" . $seq . "a"]) ? $row[$prefix . "_cutoff_month_" . $seq . "a"] : "",
@@ -599,10 +616,12 @@ function calculate_expected_receiving_payment_date_by_prefix($completion_date, $
 		isset($row[$prefix . "_deadline_" . $seq . "b"]) ? $row[$prefix . "_deadline_" . $seq . "b"] : "",
 		isset($row[$prefix . "_payment_months_" . $seq . "b"]) ? $row[$prefix . "_payment_months_" . $seq . "b"] : "",
 		isset($row[$prefix . "_payment_date_" . $seq . "b"]) ? $row[$prefix . "_payment_date_" . $seq . "b"] : "",
-		isset($row[$prefix . "_payment_days_" . $seq . "b"]) ? $row[$prefix . "_payment_days_" . $seq . "b"] : 0
+		isset($row[$prefix . "_payment_days_" . $seq . "b"]) ? $row[$prefix . "_payment_days_" . $seq . "b"] : 0,
+		$auto_delivery_date,
+		$auto_grouting_date
 	);
 
-	return move_weekend_to_next_monday($date);
+	return $date;
 }
 
 /**
@@ -617,6 +636,8 @@ function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_
 	$is_grouting_cleaning = (strpos($normalized_base_date, "灌漿日清運日") !== false && $has_next_floor_grouting);
 	$is_two_ratio = (strpos($normalized_base_date, "2次占比") !== false || strpos($normalized_base_date, "分2次占比") !== false);
 	$use_two_ratio = $is_two_ratio || $is_grouting_cleaning;
+	$is_grouting_only = ($has_grouting_date && !$has_delivery_date && !$use_two_ratio && !$has_cleaning_date && !$has_next_floor_grouting);
+	$is_cleaning_first_only = ($has_cleaning_date && !$has_delivery_date && !$use_two_ratio);
 
 	$dates = array("", "", "", "");
 	$delivery_base = is_valid_floorcashflow_date($delivery_date) ? substr($delivery_date, 0, 10) : "";
@@ -628,24 +649,41 @@ function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_
 		$warning_list[] = $building." ".$floor." 缺少下一層灌漿日";
 	}
 
+	if ($is_cleaning_first_only && $next_grouting_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+		return $dates;
+	} else if ($is_cleaning_first_only) {
+		return $dates;
+	}
+
 	if ($use_next_base && $next_grouting_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2);
-		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 1);
-		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 2);
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 1, $delivery_base, $grouting_base);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 2, $delivery_base, $grouting_base);
+		return $dates;
+	}
+
+	if ($is_grouting_only && $grouting_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+		return $dates;
+	} else if ($is_grouting_only) {
+		$warning_list[] = $building." ".$floor." 缺少灌漿日";
 		return $dates;
 	}
 
 	if (($use_two_ratio || $has_delivery_date) && $delivery_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 1);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 2);
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
 	} else if ($has_delivery_date) {
 		$warning_list[] = $building." ".$floor." 缺少交版日";
 	}
 
 	if (($use_two_ratio || $has_grouting_date) && $grouting_base != "") {
-		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 1);
-		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 2);
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 1, $delivery_base, $grouting_base);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 2, $delivery_base, $grouting_base);
 	} else if ($has_grouting_date) {
 		$warning_list[] = $building." ".$floor." 缺少灌漿日";
 	}

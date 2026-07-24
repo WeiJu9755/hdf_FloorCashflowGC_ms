@@ -33,13 +33,17 @@ function processform($aFormValues){
 	$second_actual_billing_date			= trim($aFormValues['second_actual_billing_date']);
 	$second_layout_actual_billing_date	= trim($aFormValues['second_layout_actual_billing_date']);
 	$project_progress					= trim($aFormValues['project_progress']);
-	$completed_qty						= normalize_amount_for_sql($aFormValues['completed_qty']);
+	$first_actual_completed_qty			= normalize_amount_for_sql($aFormValues['first_actual_completed_qty']);
+	$second_actual_completed_qty		= normalize_amount_for_sql($aFormValues['second_actual_completed_qty']);
+	$first_layout_actual_completed_qty	= normalize_amount_for_sql($aFormValues['first_layout_actual_completed_qty']);
+	$second_layout_actual_completed_qty	= normalize_amount_for_sql($aFormValues['second_layout_actual_completed_qty']);
+	$completed_qty						= normalize_amount_for_sql(floatval($first_actual_completed_qty) + floatval($second_actual_completed_qty));
 	$first_actual_collection_date		= trim($aFormValues['first_actual_collection_date']);
 	$first_layout_actual_collection_date	= trim($aFormValues['first_layout_actual_collection_date']);
 	$second_actual_collection_date		= trim($aFormValues['second_actual_collection_date']);
 	$second_layout_actual_collection_date	= trim($aFormValues['second_layout_actual_collection_date']);
-	$retention_deduction_amount			= normalize_amount_for_sql($aFormValues['retention_deduction_amount']);
-	$advance_payment_deduction_amount	= normalize_amount_for_sql($aFormValues['advance_payment_deduction_amount']);
+	$first_other_deduction_amount		= normalize_amount_for_sql($aFormValues['first_other_deduction_amount']);
+	$second_other_deduction_amount		= normalize_amount_for_sql($aFormValues['second_other_deduction_amount']);
 	$payment_request_stage				= trim($aFormValues['payment_request_stage']);
 	$remark								= trim($aFormValues['remark']);
 	
@@ -55,7 +59,32 @@ function processform($aFormValues){
 	$mDB = "";
 	$mDB = new MywebDB();
 
-	$actual_collection_result = calculate_actual_collection_amounts($mDB, $auto_seq, floatval($completed_qty));
+	$actual_deduction_result = calculate_actual_deduction_amounts(
+		$mDB,
+		$auto_seq,
+		floatval($first_actual_completed_qty),
+		floatval($second_actual_completed_qty)
+	);
+	if (!$actual_deduction_result['ok']) {
+		$mDB->remove();
+		$error_message = addslashes($actual_deduction_result['message']);
+		$objResponse->script("jAlert('警示', '$error_message', 'red', '', 2500);");
+		return $objResponse;
+	}
+
+	$first_deduction_amount = floatval($actual_deduction_result['first_retention_amount']) + floatval($actual_deduction_result['first_advance_payment_amount']) + floatval($first_other_deduction_amount);
+	$second_deduction_amount = floatval($actual_deduction_result['second_retention_amount']) + floatval($actual_deduction_result['second_advance_payment_amount']) + floatval($second_other_deduction_amount);
+
+	$actual_collection_result = calculate_actual_collection_amounts(
+		$mDB,
+		$auto_seq,
+		floatval($first_actual_completed_qty),
+		floatval($second_actual_completed_qty),
+		floatval($first_layout_actual_completed_qty),
+		floatval($second_layout_actual_completed_qty),
+		$first_deduction_amount,
+		$second_deduction_amount
+	);
 	if (!$actual_collection_result['ok']) {
 		$mDB->remove();
 		$error_message = addslashes($actual_collection_result['message']);
@@ -65,13 +94,6 @@ function processform($aFormValues){
 
 	updateFloorCashflowGCModifyLogByDetailSeq($mDB, $auto_seq, $memberID);
 
-	$expected_collection_update_sql = calculate_manual_expected_collection_update_sql(
-		$mDB,
-		$auto_seq,
-		floatval($retention_deduction_amount),
-		floatval($advance_payment_deduction_amount)
-	);
-
 	$Qry="UPDATE buildings_sub_detail set
 			 first_actual_billing_date	= '$first_actual_billing_date'
 			,first_layout_actual_billing_date	= '$first_layout_actual_billing_date'
@@ -79,6 +101,10 @@ function processform($aFormValues){
 			,second_layout_actual_billing_date	= '$second_layout_actual_billing_date'
 			,project_progress	= '$project_progress'
 			,completed_qty	= $completed_qty
+			,first_actual_completed_qty	= $first_actual_completed_qty
+			,second_actual_completed_qty	= $second_actual_completed_qty
+			,first_layout_actual_completed_qty	= $first_layout_actual_completed_qty
+			,second_layout_actual_completed_qty	= $second_layout_actual_completed_qty
 			,actual_collection_amount	= ".$actual_collection_result['total_amount']."
 			,first_actual_collection_amount	= ".$actual_collection_result['parts'][0]."
 			,first_layout_actual_collection_amount	= ".$actual_collection_result['parts'][1]."
@@ -88,9 +114,12 @@ function processform($aFormValues){
 			,first_layout_actual_collection_date	= '$first_layout_actual_collection_date'
 			,second_actual_collection_date	= '$second_actual_collection_date'
 			,second_layout_actual_collection_date	= '$second_layout_actual_collection_date'
-			,retention_deduction_amount	= $retention_deduction_amount
-			,advance_payment_deduction_amount	= $advance_payment_deduction_amount
-			$expected_collection_update_sql
+			,retention_deduction_amount	= ".$actual_deduction_result['first_retention_amount']."
+			,advance_payment_deduction_amount	= ".$actual_deduction_result['first_advance_payment_amount']."
+			,first_other_deduction_amount	= $first_other_deduction_amount
+			,second_retention_deduction_amount	= ".$actual_deduction_result['second_retention_amount']."
+			,second_advance_payment_deduction_amount	= ".$actual_deduction_result['second_advance_payment_amount']."
+			,second_other_deduction_amount	= $second_other_deduction_amount
 			,payment_request_stage	= '$payment_request_stage'
 			,remark	= '$remark'
 			,makeby	= '$memberID'
@@ -119,21 +148,18 @@ function normalize_amount_for_sql($value) {
 }
 
 /**
- * 依樓層類型取得放樣單價，乘上計價施作數量及案件稅率後，再按預計收款四階段比例分配。
+ * 依樓層類型取得標準/屋突與放樣單價，分別乘上實際數量後扣除該次扣抵款。
  */
-function calculate_actual_collection_amounts($mDB, $auto_seq, $completed_qty) {
+function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_deduction_amount, $second_deduction_amount) {
 	$auto_seq_sql = addslashes($auto_seq);
 	$Qry="SELECT
 			 a.floor,
-			 a.first_expected_collection_amount,
-			 a.first_layout_expected_collection_amount,
-			 a.second_expected_collection_amount,
-			 a.second_layout_expected_collection_amount,
 			 b.std_layer_floor,
 			 b.roof_protrusion_floor,
+			 c.std_floor_u_price,
+			 c.roof_protrusion_u_price,
 			 c.layout_std_floor_u_price,
-			 c.square_roof_protrusion_u_price,
-			 c.tax_excluded
+			 c.square_roof_protrusion_u_price
 		FROM buildings_sub_detail a
 		LEFT JOIN buildings_sub b ON b.case_id = a.case_id AND b.building = a.building
 		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
@@ -149,38 +175,28 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $completed_qty) {
 	$roof_floors = actual_collection_floor_range_list($row['roof_protrusion_floor']);
 
 	if ($floor_key != "" && isset($std_floors[$floor_key])) {
+		$unit_price = floatval($row['std_floor_u_price']);
 		$layout_unit_price = floatval($row['layout_std_floor_u_price']);
 	} else if ($floor_key != "" && isset($roof_floors[$floor_key])) {
+		$unit_price = floatval($row['roof_protrusion_u_price']);
 		$layout_unit_price = floatval($row['square_roof_protrusion_u_price']);
 	} else {
-		return array('ok' => false, 'message' => '此樓層不在標準層或屋突層設定範圍內，無法判斷放樣單價。');
+		return array('ok' => false, 'message' => '此樓層不在標準層或屋突層設定範圍內，無法判斷實際收款單價。');
 	}
 
-	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
-	$total_amount = round($layout_unit_price * max(0, floatval($completed_qty)) * $tax_multiplier, 2);
-	$weights = array(
-		floatval($row['first_expected_collection_amount']),
-		floatval($row['first_layout_expected_collection_amount']),
-		floatval($row['second_expected_collection_amount']),
-		floatval($row['second_layout_expected_collection_amount'])
+	$first_qty = max(0, floatval($first_actual_completed_qty));
+	$second_qty = max(0, floatval($second_actual_completed_qty));
+	$first_layout_qty = max(0, floatval($first_layout_actual_completed_qty));
+	$second_layout_qty = max(0, floatval($second_layout_actual_completed_qty));
+	$first_deduction_amount = floatval($first_deduction_amount);
+	$second_deduction_amount = floatval($second_deduction_amount);
+	$parts = array(
+		round(($unit_price * $first_qty) - $first_deduction_amount, 2),
+		round(($layout_unit_price * $first_layout_qty) - $first_deduction_amount, 2),
+		round(($unit_price * $second_qty) - $second_deduction_amount, 2),
+		round(($layout_unit_price * $second_layout_qty) - $second_deduction_amount, 2)
 	);
-	$total_weight = array_sum($weights);
-	if ($total_weight <= 0 && $total_amount != 0) {
-		return array('ok' => false, 'message' => '預計收款金額尚未設定，無法取得實際收款的分配比例。');
-	}
-
-	$parts = array(0, 0, 0, 0);
-	$allocated_amount = 0;
-	if ($total_weight > 0) {
-		for ($i = 0; $i < count($weights); $i++) {
-			if ($i == count($weights) - 1) {
-				$parts[$i] = round($total_amount - $allocated_amount, 2);
-			} else {
-				$parts[$i] = round($total_amount * ($weights[$i] / $total_weight), 2);
-				$allocated_amount += $parts[$i];
-			}
-		}
-	}
+	$total_amount = round(array_sum($parts), 2);
 
 	return array(
 		'ok' => true,
@@ -195,11 +211,67 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $completed_qty) {
 }
 
 /**
- * 判斷案件的稅別欄位是否代表未稅；未稅時實際收款金額需加計 5% 稅額。
+ * 依樓層單價與第一次/第二次實際計價數量，自動計算實際扣抵保留款與預收款。
  */
-function actual_collection_is_tax_excluded($value) {
-	$value = strtoupper(trim((string)$value));
-	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
+function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty) {
+	$auto_seq_sql = addslashes($auto_seq);
+	$Qry="SELECT
+			 a.case_id,
+			 a.floor,
+			 b.std_layer_floor,
+			 b.roof_protrusion_floor,
+			 c.std_floor_u_price,
+			 c.roof_protrusion_u_price
+		FROM buildings_sub_detail a
+		LEFT JOIN buildings_sub b ON b.case_id = a.case_id AND b.building = a.building
+		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
+		WHERE a.auto_seq = '$auto_seq_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return array('ok' => false, 'message' => '找不到樓層資料，無法計算實際扣抵金額。');
+	}
+
+	$row = $mDB->fetchRow(2);
+	$floor_key = actual_collection_floor_key($row['floor']);
+	$std_floors = actual_collection_floor_range_list($row['std_layer_floor']);
+	$roof_floors = actual_collection_floor_range_list($row['roof_protrusion_floor']);
+
+	if ($floor_key != "" && isset($std_floors[$floor_key])) {
+		$unit_price = floatval($row['std_floor_u_price']);
+	} else if ($floor_key != "" && isset($roof_floors[$floor_key])) {
+		$unit_price = floatval($row['roof_protrusion_u_price']);
+	} else {
+		return array('ok' => false, 'message' => '此樓層不在標準層或屋突層設定範圍內，無法判斷實際扣抵單價。');
+	}
+
+	$case_id_sql = addslashes($row['case_id']);
+	$retention_rate = actual_deduction_case_percentage_sum($mDB, "retention", $case_id_sql) / 100;
+	$advance_payment_rate = actual_deduction_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
+	$first_base_amount = max(0, floatval($first_actual_completed_qty)) * $unit_price;
+	$second_base_amount = max(0, floatval($second_actual_completed_qty)) * $unit_price;
+
+	return array(
+		'ok' => true,
+		'first_retention_amount' => number_format(round($first_base_amount * $retention_rate, 2), 2, '.', ''),
+		'first_advance_payment_amount' => number_format(round($first_base_amount * $advance_payment_rate, 2), 2, '.', ''),
+		'second_retention_amount' => number_format(round($second_base_amount * $retention_rate, 2), 2, '.', ''),
+		'second_advance_payment_amount' => number_format(round($second_base_amount * $advance_payment_rate, 2), 2, '.', '')
+	);
+}
+
+function actual_deduction_case_percentage_sum($mDB, $table_name, $case_id_sql) {
+	if (!in_array($table_name, array("retention", "advance_payment"), true)) {
+		return 0;
+	}
+
+	$Qry="SELECT COALESCE(SUM(percentage), 0) AS percentage_total FROM $table_name WHERE case_id = '$case_id_sql'";
+	$mDB->query($Qry);
+	if ($mDB->rowCount() == 0) {
+		return 0;
+	}
+
+	$row = $mDB->fetchRow(2);
+	return floatval($row['percentage_total']);
 }
 
 function actual_collection_floor_range_list($floor_text) {
@@ -257,48 +329,6 @@ function actual_collection_floor_code($floor_text) {
 	return false;
 }
 
-function calculate_manual_expected_collection_update_sql($mDB, $auto_seq, $new_retention_amount, $new_advance_payment_amount) {
-	$auto_seq_sql = addslashes($auto_seq);
-	$Qry="SELECT first_expected_collection_amount,first_layout_expected_collection_amount,second_expected_collection_amount,second_layout_expected_collection_amount,retention_deduction_amount,advance_payment_deduction_amount
-		FROM buildings_sub_detail
-		WHERE auto_seq = '$auto_seq_sql'";
-	$mDB->query($Qry);
-	if ($mDB->rowCount() == 0) {
-		return "";
-	}
-
-	$row = $mDB->fetchRow(2);
-	$current_parts = array(
-		floatval($row['first_expected_collection_amount']),
-		floatval($row['first_layout_expected_collection_amount']),
-		floatval($row['second_expected_collection_amount']),
-		floatval($row['second_layout_expected_collection_amount'])
-	);
-	$current_net_amount = array_sum($current_parts);
-	if ($current_net_amount == 0) {
-		return "";
-	}
-
-	$base_amount = $current_net_amount + floatval($row['retention_deduction_amount']) + floatval($row['advance_payment_deduction_amount']);
-	$new_net_amount = $base_amount - $new_retention_amount - $new_advance_payment_amount;
-	$new_parts = array();
-	$allocated_amount = 0;
-	for ($i = 0; $i < count($current_parts); $i++) {
-		if ($i == count($current_parts) - 1) {
-			$new_parts[$i] = round($new_net_amount - $allocated_amount, 2);
-		} else {
-			$new_parts[$i] = round($new_net_amount * ($current_parts[$i] / $current_net_amount), 2);
-			$allocated_amount += $new_parts[$i];
-		}
-	}
-
-	return "
-			,first_expected_collection_amount = ".$new_parts[0]."
-			,first_layout_expected_collection_amount = ".$new_parts[1]."
-			,second_expected_collection_amount = ".$new_parts[2]."
-			,second_layout_expected_collection_amount = ".$new_parts[3];
-}
-
 $xajax->processRequest();
 
 
@@ -324,6 +354,10 @@ $second_expected_collection_amount = "";
 $second_layout_expected_collection_amount = "";
 $retention_deduction_amount = "";
 $advance_payment_deduction_amount = "";
+$first_other_deduction_amount = "";
+$second_retention_deduction_amount = "";
+$second_advance_payment_deduction_amount = "";
+$second_other_deduction_amount = "";
 $first_expected_collection_date_1 = "";
 $first_expected_collection_date_2 = "";
 $second_expected_collection_date_1 = "";
@@ -337,6 +371,10 @@ $second_actual_billing_date = "";
 $second_layout_actual_billing_date = "";
 $project_progress = "";
 $completed_qty = "";
+$first_actual_completed_qty = "";
+$second_actual_completed_qty = "";
+$first_layout_actual_completed_qty = "";
+$second_layout_actual_completed_qty = "";
 $actual_collection_amount = "";
 $first_actual_collection_amount = "";
 $first_layout_actual_collection_amount = "";
@@ -371,6 +409,10 @@ if ($total > 0) {
 	$second_layout_expected_collection_amount = $row['second_layout_expected_collection_amount'];
 	$retention_deduction_amount = $row['retention_deduction_amount'];
 	$advance_payment_deduction_amount = $row['advance_payment_deduction_amount'];
+	$first_other_deduction_amount = $row['first_other_deduction_amount'];
+	$second_retention_deduction_amount = $row['second_retention_deduction_amount'];
+	$second_advance_payment_deduction_amount = $row['second_advance_payment_deduction_amount'];
+	$second_other_deduction_amount = $row['second_other_deduction_amount'];
 	$first_expected_collection_date_1 = $row['first_expected_collection_date_1'];
 	$first_expected_collection_date_2 = $row['first_expected_collection_date_2'];
 	$second_expected_collection_date_1 = $row['second_expected_collection_date_1'];
@@ -384,6 +426,10 @@ if ($total > 0) {
 	$second_layout_actual_billing_date = $row['second_layout_actual_billing_date'];
 	$project_progress = $row['project_progress'];
 	$completed_qty = $row['completed_qty'];
+	$first_actual_completed_qty = $row['first_actual_completed_qty'];
+	$second_actual_completed_qty = $row['second_actual_completed_qty'];
+	$first_layout_actual_completed_qty = $row['first_layout_actual_completed_qty'];
+	$second_layout_actual_completed_qty = $row['second_layout_actual_completed_qty'];
 	$actual_collection_amount = $row['actual_collection_amount'];
 	$first_actual_collection_amount = $row['first_actual_collection_amount'];
 	$first_layout_actual_collection_amount = $row['first_layout_actual_collection_amount'];
@@ -408,6 +454,13 @@ if ($first_actual_collection_amount == "" && $first_layout_actual_collection_amo
 if ($first_actual_collection_date == "" && $first_layout_actual_collection_date == "" && $second_actual_collection_date == "" && $second_layout_actual_collection_date == "" && $actual_collection_date != "") {
 	$first_actual_collection_date = $actual_collection_date;
 }
+if ($first_actual_completed_qty == "" && $second_actual_completed_qty == "" && $completed_qty != "") {
+	$first_actual_completed_qty = $completed_qty;
+}
+if ($first_layout_actual_completed_qty == "" && $second_layout_actual_completed_qty == "") {
+	$first_layout_actual_completed_qty = $first_actual_completed_qty;
+	$second_layout_actual_completed_qty = $second_actual_completed_qty;
+}
 
 
 $mDB->remove();
@@ -418,6 +471,10 @@ $show_second_expected_collection_amount = ($second_expected_collection_amount !=
 $show_second_layout_expected_collection_amount = ($second_layout_expected_collection_amount != "" && $second_layout_expected_collection_amount != 0) ? number_format($second_layout_expected_collection_amount, 2) : "";
 $show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
 $show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
+$show_first_other_deduction_amount = ($first_other_deduction_amount != "" && $first_other_deduction_amount != 0) ? number_format($first_other_deduction_amount, 2) : "";
+$show_second_retention_deduction_amount = ($second_retention_deduction_amount != "" && $second_retention_deduction_amount != 0) ? number_format($second_retention_deduction_amount, 2) : "";
+$show_second_advance_payment_deduction_amount = ($second_advance_payment_deduction_amount != "" && $second_advance_payment_deduction_amount != 0) ? number_format($second_advance_payment_deduction_amount, 2) : "";
+$show_second_other_deduction_amount = ($second_other_deduction_amount != "" && $second_other_deduction_amount != 0) ? number_format($second_other_deduction_amount, 2) : "";
 $show_expected_collection_amount = "
 	<div class=\"summary_line\"><span>第一次金額：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
 	<div class=\"summary_line\"><span>第二次金額：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
@@ -482,14 +539,25 @@ $show_actual_collection_amount_inputs = "
 			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong>$show_second_layout_actual_collection_amount</strong></div>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依放樣單價、計價(施作)數量及預計收款比例自動計算。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依樓層類型的標準/屋突單價、放樣單價、第一次/第二次實際數量與各次扣抵款自動計算。</div>
 ";
 
 $show_deduction_amount_inputs = "
-	<div class=\"actual_grid\">
-		<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" name=\"retention_deduction_amount\" value=\"$retention_deduction_amount\" onchange=\"setEdit();\"></div>
-		<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" name=\"advance_payment_deduction_amount\" value=\"$advance_payment_deduction_amount\" onchange=\"setEdit();\"></div>
+	<div class=\"deduction_stage_grid\">
+		<div class=\"deduction_stage_panel\">
+			<div class=\"deduction_stage_title\">第一次</div>
+			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_retention_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_advance_payment_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_other_deduction_amount\" value=\"$first_other_deduction_amount\" onchange=\"setEdit();\"></div>
+		</div>
+		<div class=\"deduction_stage_panel\">
+			<div class=\"deduction_stage_title\">第二次</div>
+			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_second_retention_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_second_advance_payment_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_other_deduction_amount\" value=\"$second_other_deduction_amount\" onchange=\"setEdit();\"></div>
+		</div>
 	</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依第一次/第二次實際計價數量、樓層單價、保留款總%與預收款總%自動計算。</div>
 ";
 
 $show_actual_collection_date_inputs = "
@@ -674,6 +742,26 @@ $style_css=<<<EOT
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 8px 12px;
+}
+
+.deduction_stage_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.deduction_stage_panel {
+	display: grid;
+	gap: 8px;
+	align-content: start;
+}
+
+.deduction_stage_title {
+	font-size: 13px;
+	font-weight: 700;
+	color: #0b5f75;
+	padding-bottom: 4px;
+	border-bottom: 1px solid #d8e2ea;
 }
 
 .cashflow_edit_grid {
@@ -928,6 +1016,25 @@ $style_css=<<<EOT
 	gap: 8px;
 }
 
+.deduction_stage_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+.deduction_stage_panel {
+	display: grid;
+	gap: 8px;
+}
+
+.deduction_stage_title {
+	font-size: 13px;
+	font-weight: 700;
+	color: #0b5f75;
+	padding-bottom: 4px;
+	border-bottom: 1px solid #d8e2ea;
+}
+
 .cashflow_edit_grid {
 	display: grid;
 	grid-template-columns: 1fr;
@@ -1095,16 +1202,49 @@ $style_css
 								<div class="field_value">$show_expected_collection_amount</div>
 							</div>
 							<div class="readonly_item">
-								<div class="field_label">扣抵保留/租賃預收差款</div>
+								<div class="field_label">第一次扣抵保留/租賃預收差款</div>
 								<div class="field_value">$show_retention_deduction_amount</div>
 							</div>
 							<div class="readonly_item">
-								<div class="field_label">扣抵預收款</div>
+								<div class="field_label">第一次扣抵預收款</div>
 								<div class="field_value">$show_advance_payment_deduction_amount</div>
 							</div>
 							<div class="readonly_item">
-								<div class="field_label">計價(施作)數量</div>
-								<input type="number" class="form-control" name="completed_qty" value="$completed_qty" min="0" step="0.01" onchange="setEdit();" />
+								<div class="field_label">第一次其他扣抵款</div>
+								<div class="field_value">$show_first_other_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">第二次扣抵保留/租賃預收差款</div>
+								<div class="field_value">$show_second_retention_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">第二次扣抵預收款</div>
+								<div class="field_value">$show_second_advance_payment_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">第二次其他扣抵款</div>
+								<div class="field_value">$show_second_other_deduction_amount</div>
+							</div>
+							<div class="readonly_item">
+								<div class="field_label">實際計價與放樣數量</div>
+								<div class="actual_grid">
+									<div>
+										<div class="actual_label">第一次實際計價數量</div>
+										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+									</div>
+									<div>
+										<div class="actual_label">第一次實際放樣數量</div>
+										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+									</div>
+									<div>
+										<div class="actual_label">第二次實際計價數量</div>
+										<input type="number" class="form-control actual_field" name="second_actual_completed_qty" value="$second_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+									</div>
+									<div>
+										<div class="actual_label">第二次實際放樣數量</div>
+										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -1120,7 +1260,7 @@ $style_css
 								$show_actual_collection_amount_inputs
 							</div>
 							<div class="cashflow_edit_panel">
-								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>預計扣抵金額</span></div>
+								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>實際扣抵金額</span></div>
 								$show_deduction_amount_inputs
 							</div>
 							<div class="cashflow_edit_panel">
