@@ -145,18 +145,36 @@ $show_buildings_sub_detail=<<<EOT
 .deduction-amount-box {
 	min-width: 150px;
 }
+.actual-completed-box {
+	min-width: 430px;
+	line-height: 1.7;
+	text-align: left;
+	white-space: nowrap;
+}
 .work-qty-line,
-.collection-amount-line {
+.collection-amount-line,
+.actual-completed-line {
 	font-size: 12px;
 	color: #0f172a;
 }
 .work-qty-label,
-.collection-amount-label {
+.collection-amount-label,
+.actual-completed-label,
+.actual-completed-stage {
 	font-weight: 700;
 	color: #475569;
 }
+.actual-completed-stage {
+	display: inline-block;
+	width: 42px;
+}
+.actual-completed-label {
+	display: inline-block;
+	margin-left: 10px;
+}
 .work-qty-value,
-.collection-amount-value {
+.collection-amount-value,
+.actual-completed-value {
 	display: inline-block;
 	font-weight: 700;
 	text-align: right;
@@ -175,6 +193,12 @@ $show_buildings_sub_detail=<<<EOT
 }
 .deduction-amount-box .collection-amount-value {
 	min-width: 68px;
+}
+.actual-completed-value {
+	min-width: 62px;
+}
+.actual-completed-amount {
+	min-width: 82px;
 }
 .work-qty-gap,
 .collection-amount-gap {
@@ -237,6 +261,12 @@ $list_view
 					return number_format(aData[idx]);
 				}
 
+				function amountToNumber(value) {
+					value = (value == null) ? '' : String(value).replace(/,/g, '');
+					var result = parseFloat(value);
+					return isNaN(result) ? 0 : result;
+				}
+
 				function showWorkQty(idx) {
 					var values = showText(idx).split('||');
 					while (values.length < 4) {
@@ -267,15 +297,30 @@ $list_view
 
 				function showActualCompletedQty(idx) {
 					var values = showText(idx).split('||');
-					while (values.length < 4) {
+					while (values.length < 6) {
 						values.push('');
 					}
 					for (var i = 0; i < values.length; i++) {
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
+					return '<div class="actual-completed-box">'
+						+'<div class="actual-completed-line"><span class="actual-completed-stage">第一次</span><span class="actual-completed-label">計價：</span><span class="actual-completed-value first-stage-value">'+values[0]+'</span><span class="actual-completed-label">放樣：</span><span class="actual-completed-value first-stage-value">'+values[1]+'</span><span class="actual-completed-label">實際金額：</span><span class="actual-completed-value actual-completed-amount first-stage-value">'+values[2]+'</span></div>'
+						+'<div class="actual-completed-line"><span class="actual-completed-stage">第二次</span><span class="actual-completed-label">計價：</span><span class="actual-completed-value second-stage-value">'+values[3]+'</span><span class="actual-completed-label">放樣：</span><span class="actual-completed-value second-stage-value">'+values[4]+'</span><span class="actual-completed-label">實際金額：</span><span class="actual-completed-value actual-completed-amount second-stage-value">'+values[5]+'</span></div>'
+						+'</div>';
+				}
+
+				function showActualCollectionAmount(idx) {
+					var values = showText(idx).split('||');
+					while (values.length < 4) {
+						values.push('');
+					}
+					var firstAmount = amountToNumber(values[0]) + amountToNumber(values[1]);
+					var secondAmount = amountToNumber(values[2]) + amountToNumber(values[3]);
+					values[0] = (firstAmount != 0) ? number_format(firstAmount, 2) : '';
+					values[1] = (secondAmount != 0) ? number_format(secondAmount, 2) : '';
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次計價：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次計價：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次金額：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次金額：</span><span class="collection-amount-value second-stage-value">'+values[1]+'</span></div>'
 						+'</div>';
 				}
 
@@ -406,7 +451,7 @@ $list_view
 				$('td:eq(13)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+completed_qty+'</div>' );
 
 				//實際收款金額
-				var actual_collection_amount = showCollectionAmount(14);
+				var actual_collection_amount = showActualCollectionAmount(14);
 
 				$('td:eq(14)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-center" style="height:auto;min-height:32px;">'+actual_collection_amount+'</div>' );
 

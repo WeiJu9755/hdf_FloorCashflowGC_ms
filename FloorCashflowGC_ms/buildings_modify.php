@@ -440,7 +440,7 @@ function get_auto_floor_date_day_text_type($dayText) {
 	if (strpos($normalized_day_text, "灌漿日") !== false) {
 		return "grouting";
 	}
-	if (strpos($normalized_day_text, "交版日") !== false || strpos($normalized_day_text, "交板日") !== false) {
+	if (strpos($normalized_day_text, "交版日") !== false) {
 		return "delivery";
 	}
 	return "";
