@@ -44,6 +44,10 @@ function processform($aFormValues){
 	$second_layout_actual_collection_date	= trim($aFormValues['second_layout_actual_collection_date']);
 	$first_other_deduction_amount		= normalize_amount_for_sql($aFormValues['first_other_deduction_amount']);
 	$second_other_deduction_amount		= normalize_amount_for_sql($aFormValues['second_other_deduction_amount']);
+	$retention_deduction_source			= deduction_source_from_checkbox($aFormValues, 'retention_deduction_source_manual');
+	$advance_payment_deduction_source	= deduction_source_from_checkbox($aFormValues, 'advance_payment_deduction_source_manual');
+	$second_retention_deduction_source	= deduction_source_from_checkbox($aFormValues, 'second_retention_deduction_source_manual');
+	$second_advance_payment_deduction_source = deduction_source_from_checkbox($aFormValues, 'second_advance_payment_deduction_source_manual');
 	$payment_request_stage				= trim($aFormValues['payment_request_stage']);
 	$remark								= trim($aFormValues['remark']);
 	
@@ -63,7 +67,9 @@ function processform($aFormValues){
 		$mDB,
 		$auto_seq,
 		floatval($first_actual_completed_qty),
-		floatval($second_actual_completed_qty)
+		floatval($second_actual_completed_qty),
+		floatval($first_layout_actual_completed_qty),
+		floatval($second_layout_actual_completed_qty)
 	);
 	if (!$actual_deduction_result['ok']) {
 		$mDB->remove();
@@ -72,8 +78,21 @@ function processform($aFormValues){
 		return $objResponse;
 	}
 
-	$first_deduction_amount = floatval($actual_deduction_result['first_retention_amount']) + floatval($actual_deduction_result['first_advance_payment_amount']) + floatval($first_other_deduction_amount);
-	$second_deduction_amount = floatval($actual_deduction_result['second_retention_amount']) + floatval($actual_deduction_result['second_advance_payment_amount']) + floatval($second_other_deduction_amount);
+	$retention_deduction_amount = ($retention_deduction_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['retention_deduction_amount'])
+		: $actual_deduction_result['first_retention_amount'];
+	$advance_payment_deduction_amount = ($advance_payment_deduction_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['advance_payment_deduction_amount'])
+		: $actual_deduction_result['first_advance_payment_amount'];
+	$second_retention_deduction_amount = ($second_retention_deduction_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['second_retention_deduction_amount'])
+		: $actual_deduction_result['second_retention_amount'];
+	$second_advance_payment_deduction_amount = ($second_advance_payment_deduction_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['second_advance_payment_deduction_amount'])
+		: $actual_deduction_result['second_advance_payment_amount'];
+
+	$first_deduction_amount = floatval($retention_deduction_amount) + floatval($advance_payment_deduction_amount) + floatval($first_other_deduction_amount);
+	$second_deduction_amount = floatval($second_retention_deduction_amount) + floatval($second_advance_payment_deduction_amount) + floatval($second_other_deduction_amount);
 
 	$actual_collection_result = calculate_actual_collection_amounts(
 		$mDB,
@@ -116,11 +135,15 @@ function processform($aFormValues){
 			,first_layout_actual_collection_date	= '$first_layout_actual_collection_date'
 			,second_actual_collection_date	= '$second_actual_collection_date'
 			,second_layout_actual_collection_date	= '$second_layout_actual_collection_date'
-			,retention_deduction_amount	= ".$actual_deduction_result['first_retention_amount']."
-			,advance_payment_deduction_amount	= ".$actual_deduction_result['first_advance_payment_amount']."
+			,retention_deduction_amount	= $retention_deduction_amount
+			,retention_deduction_source	= '$retention_deduction_source'
+			,advance_payment_deduction_amount	= $advance_payment_deduction_amount
+			,advance_payment_deduction_source	= '$advance_payment_deduction_source'
 			,first_other_deduction_amount	= $first_other_deduction_amount
-			,second_retention_deduction_amount	= ".$actual_deduction_result['second_retention_amount']."
-			,second_advance_payment_deduction_amount	= ".$actual_deduction_result['second_advance_payment_amount']."
+			,second_retention_deduction_amount	= $second_retention_deduction_amount
+			,second_retention_deduction_source	= '$second_retention_deduction_source'
+			,second_advance_payment_deduction_amount	= $second_advance_payment_deduction_amount
+			,second_advance_payment_deduction_source	= '$second_advance_payment_deduction_source'
 			,second_other_deduction_amount	= $second_other_deduction_amount
 			,payment_request_stage	= '$payment_request_stage'
 			,remark	= '$remark'
@@ -137,6 +160,11 @@ function processform($aFormValues){
 	$objResponse->script("$('#second_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_billing_amount']), 2)."');");
 	$objResponse->script("$('#first_actual_collection_amount_preview').text('".number_format(floatval($actual_collection_result['parts'][0]), 2)."');");
 	$objResponse->script("$('#second_actual_collection_amount_preview').text('".number_format(floatval($actual_collection_result['parts'][2]), 2)."');");
+	$objResponse->script("$('#retention_deduction_amount').val('".number_format(floatval($retention_deduction_amount), 2, '.', '')."');");
+	$objResponse->script("$('#advance_payment_deduction_amount').val('".number_format(floatval($advance_payment_deduction_amount), 2, '.', '')."');");
+	$objResponse->script("$('#second_retention_deduction_amount').val('".number_format(floatval($second_retention_deduction_amount), 2, '.', '')."');");
+	$objResponse->script("$('#second_advance_payment_deduction_amount').val('".number_format(floatval($second_advance_payment_deduction_amount), 2, '.', '')."');");
+	$objResponse->script("commitDeductionDefaults();");
 	$objResponse->script("if (parent && typeof parent.buildings_sub_detail_myDraw == 'function') { parent.buildings_sub_detail_myDraw(); }");
 		
 	
@@ -151,6 +179,14 @@ function normalize_amount_for_sql($value) {
 	return (string)floatval($value);
 }
 
+function normalize_deduction_source($value) {
+	return (strtolower(trim((string)$value)) == 'manual') ? 'manual' : 'auto';
+}
+
+function deduction_source_from_checkbox($form_values, $field_name) {
+	return (isset($form_values[$field_name]) && (string)$form_values[$field_name] == '1') ? 'manual' : 'auto';
+}
+
 /**
  * 依樓層類型取得標準/屋突與放樣單價，計價與放樣合併後再扣除該次扣抵款。
  */
@@ -163,7 +199,8 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 			 c.std_floor_u_price,
 			 c.roof_protrusion_u_price,
 			 c.layout_std_floor_u_price,
-			 c.square_roof_protrusion_u_price
+			 c.square_roof_protrusion_u_price,
+			 c.tax_excluded
 		FROM buildings_sub_detail a
 		LEFT JOIN buildings_sub b ON b.case_id = a.case_id AND b.building = a.building
 		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
@@ -194,10 +231,9 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 	$second_layout_qty = max(0, floatval($second_layout_actual_completed_qty));
 	$first_deduction_amount = floatval($first_deduction_amount);
 	$second_deduction_amount = floatval($second_deduction_amount);
-	$first_layout_amount = round($layout_unit_price * $first_layout_qty, 2);
-	$second_layout_amount = round($layout_unit_price * $second_layout_qty, 2);
-	$first_actual_billing_amount = round(($unit_price * $first_qty) + $first_layout_amount, 2);
-	$second_actual_billing_amount = round(($unit_price * $second_qty) + $second_layout_amount, 2);
+	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
+	$first_actual_billing_amount = round((($unit_price * $first_qty) + ($layout_unit_price * $first_layout_qty)) * $tax_multiplier, 2);
+	$second_actual_billing_amount = round((($unit_price * $second_qty) + ($layout_unit_price * $second_layout_qty)) * $tax_multiplier, 2);
 	$parts = array(
 		round($first_actual_billing_amount - $first_deduction_amount, 2),
 		0,
@@ -221,9 +257,17 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 }
 
 /**
- * 依樓層單價與第一次/第二次實際計價數量，自動計算實際扣抵保留款與預收款。
+ * 未稅計價時，實際計價金額需加計 5% 營業稅；扣抵款本身已依各自稅別計算，不在此重複加稅。
  */
-function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty) {
+function actual_collection_is_tax_excluded($value) {
+	$value = strtoupper(trim((string)$value));
+	return in_array($value, array("1", "Y", "YES", "ON", "TRUE", "T", "是", "有", "勾選", "未稅"), true);
+}
+
+/**
+ * 依樓層單價、放樣單價與第一次/第二次實際數量，自動計算實際扣抵保留款與預收款。
+ */
+function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty) {
 	$auto_seq_sql = addslashes($auto_seq);
 	$Qry="SELECT
 			 a.case_id,
@@ -231,7 +275,9 @@ function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_compl
 			 b.std_layer_floor,
 			 b.roof_protrusion_floor,
 			 c.std_floor_u_price,
-			 c.roof_protrusion_u_price
+			 c.roof_protrusion_u_price,
+			 c.layout_std_floor_u_price,
+			 c.square_roof_protrusion_u_price
 		FROM buildings_sub_detail a
 		LEFT JOIN buildings_sub b ON b.case_id = a.case_id AND b.building = a.building
 		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
@@ -248,8 +294,10 @@ function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_compl
 
 	if ($floor_key != "" && isset($std_floors[$floor_key])) {
 		$unit_price = floatval($row['std_floor_u_price']);
+		$layout_unit_price = floatval($row['layout_std_floor_u_price']);
 	} else if ($floor_key != "" && isset($roof_floors[$floor_key])) {
 		$unit_price = floatval($row['roof_protrusion_u_price']);
+		$layout_unit_price = floatval($row['square_roof_protrusion_u_price']);
 	} else {
 		return array('ok' => false, 'message' => '此樓層不在標準層或屋突層設定範圍內，無法判斷實際扣抵單價。');
 	}
@@ -257,8 +305,8 @@ function calculate_actual_deduction_amounts($mDB, $auto_seq, $first_actual_compl
 	$case_id_sql = addslashes($row['case_id']);
 	$retention_rate = actual_deduction_case_percentage_sum($mDB, "retention", $case_id_sql) / 100;
 	$advance_payment_rate = actual_deduction_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
-	$first_base_amount = max(0, floatval($first_actual_completed_qty)) * $unit_price;
-	$second_base_amount = max(0, floatval($second_actual_completed_qty)) * $unit_price;
+	$first_base_amount = round((max(0, floatval($first_actual_completed_qty)) * $unit_price) + (max(0, floatval($first_layout_actual_completed_qty)) * $layout_unit_price), 2);
+	$second_base_amount = round((max(0, floatval($second_actual_completed_qty)) * $unit_price) + (max(0, floatval($second_layout_actual_completed_qty)) * $layout_unit_price), 2);
 
 	return array(
 		'ok' => true,
@@ -363,10 +411,14 @@ $first_layout_expected_collection_amount = "";
 $second_expected_collection_amount = "";
 $second_layout_expected_collection_amount = "";
 $retention_deduction_amount = "";
+$retention_deduction_source = "auto";
 $advance_payment_deduction_amount = "";
+$advance_payment_deduction_source = "auto";
 $first_other_deduction_amount = "";
 $second_retention_deduction_amount = "";
+$second_retention_deduction_source = "auto";
 $second_advance_payment_deduction_amount = "";
+$second_advance_payment_deduction_source = "auto";
 $second_other_deduction_amount = "";
 $first_expected_collection_date_1 = "";
 $first_expected_collection_date_2 = "";
@@ -420,10 +472,14 @@ if ($total > 0) {
 	$second_expected_collection_amount = $row['second_expected_collection_amount'];
 	$second_layout_expected_collection_amount = $row['second_layout_expected_collection_amount'];
 	$retention_deduction_amount = $row['retention_deduction_amount'];
+	$retention_deduction_source = normalize_deduction_source($row['retention_deduction_source']);
 	$advance_payment_deduction_amount = $row['advance_payment_deduction_amount'];
+	$advance_payment_deduction_source = normalize_deduction_source($row['advance_payment_deduction_source']);
 	$first_other_deduction_amount = $row['first_other_deduction_amount'];
 	$second_retention_deduction_amount = $row['second_retention_deduction_amount'];
+	$second_retention_deduction_source = normalize_deduction_source($row['second_retention_deduction_source']);
 	$second_advance_payment_deduction_amount = $row['second_advance_payment_deduction_amount'];
+	$second_advance_payment_deduction_source = normalize_deduction_source($row['second_advance_payment_deduction_source']);
 	$second_other_deduction_amount = $row['second_other_deduction_amount'];
 	$first_expected_collection_date_1 = $row['first_expected_collection_date_1'];
 	$first_expected_collection_date_2 = $row['first_expected_collection_date_2'];
@@ -542,6 +598,22 @@ function build_actual_date_input($field_name, $field_value) {
 	";
 }
 
+function build_deduction_amount_input($amount_name, $source_name, $amount_value, $source_value) {
+	$source_value = normalize_deduction_source($source_value);
+	$manual_checked = ($source_value == 'manual') ? ' checked' : '';
+	$readonly = ($source_value == 'auto') ? ' readonly' : '';
+	$amount_value = number_format(floatval($amount_value), 2, '.', '');
+	return "
+		<div class=\"deduction_input_row\">
+			<input type=\"number\" class=\"form-control actual_field deduction_amount_input\" id=\"$amount_name\" name=\"$amount_name\" value=\"$amount_value\" step=\"0.01\"$readonly onchange=\"setEdit();\">
+			<label class=\"deduction_manual_toggle\" title=\"勾選後保留手動輸入金額，不再自動覆蓋\">
+				<input type=\"checkbox\" class=\"form-check-input deduction_manual_checkbox\" name=\"{$source_name}_manual\" value=\"1\" data-amount-target=\"$amount_name\"$manual_checked onchange=\"changeDeductionSource(this);\">
+				<span>手動</span>
+			</label>
+		</div>
+	";
+}
+
 $show_actual_billing_date_inputs = "
 	<div class=\"actual_grid\">
 		<div><div class=\"actual_label\">第一次日期</div>".build_actual_date_input("first_actual_billing_date", $first_actual_billing_date)."</div>
@@ -572,18 +644,18 @@ $show_deduction_amount_inputs = "
 	<div class=\"deduction_stage_grid\">
 		<div class=\"deduction_stage_panel\">
 			<div class=\"deduction_stage_title\">第一次</div>
-			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_retention_deduction_amount\" readonly></div>
-			<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_advance_payment_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div>".build_deduction_amount_input("retention_deduction_amount", "retention_deduction_source", $retention_deduction_amount, $retention_deduction_source)."</div>
+			<div><div class=\"actual_label\">扣抵預收款</div>".build_deduction_amount_input("advance_payment_deduction_amount", "advance_payment_deduction_source", $advance_payment_deduction_amount, $advance_payment_deduction_source)."</div>
 			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_other_deduction_amount\" value=\"$first_other_deduction_amount\" onchange=\"setEdit();\"></div>
 		</div>
 		<div class=\"deduction_stage_panel\">
 			<div class=\"deduction_stage_title\">第二次</div>
-			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_second_retention_deduction_amount\" readonly></div>
-			<div><div class=\"actual_label\">扣抵預收款</div><input type=\"text\" class=\"form-control actual_field\" value=\"$show_second_advance_payment_deduction_amount\" readonly></div>
+			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div>".build_deduction_amount_input("second_retention_deduction_amount", "second_retention_deduction_source", $second_retention_deduction_amount, $second_retention_deduction_source)."</div>
+			<div><div class=\"actual_label\">扣抵預收款</div>".build_deduction_amount_input("second_advance_payment_deduction_amount", "second_advance_payment_deduction_source", $second_advance_payment_deduction_amount, $second_advance_payment_deduction_source)."</div>
 			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_other_deduction_amount\" value=\"$second_other_deduction_amount\" onchange=\"setEdit();\"></div>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依第一次/第二次實際計價數量、樓層單價、保留款總%與預收款總%自動計算。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 未勾選「手動」會在存檔時自動重算；勾選後保留輸入金額，不會被自動覆蓋。</div>
 ";
 
 $show_actual_collection_date_inputs = "
@@ -784,6 +856,30 @@ $style_css=<<<EOT
 	display: grid;
 	gap: 8px;
 	align-content: start;
+}
+
+.deduction_input_row {
+	display: grid;
+	grid-template-columns: minmax(120px, 1fr) auto;
+	gap: 6px;
+	align-items: center;
+}
+
+.deduction_manual_toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0;
+	white-space: nowrap;
+	color: #475569;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.deduction_amount_input[readonly] {
+	background-color: #eef2f6;
+	color: #64748b;
 }
 
 .deduction_stage_title {
@@ -1055,6 +1151,30 @@ $style_css=<<<EOT
 .deduction_stage_panel {
 	display: grid;
 	gap: 8px;
+}
+
+.deduction_input_row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 6px;
+	align-items: center;
+}
+
+.deduction_manual_toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0;
+	white-space: nowrap;
+	color: #475569;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.deduction_amount_input[readonly] {
+	background-color: #eef2f6;
+	color: #64748b;
 }
 
 .deduction_stage_title {
@@ -1345,6 +1465,32 @@ function CheckValue() {
 	xajax_processform(xajax.getFormValues('modifyForm'));
 }
 
+function changeDeductionSource(sourceCheckbox, markEdited) {
+	var amountTarget = sourceCheckbox.getAttribute('data-amount-target');
+	var amountInput = document.getElementById(amountTarget);
+	if (amountInput) {
+		amountInput.readOnly = !sourceCheckbox.checked;
+	}
+	if (markEdited !== false) {
+		setEdit();
+	}
+}
+
+function refreshDeductionSources() {
+	$('.deduction_manual_checkbox', window.document).each(function() {
+		changeDeductionSource(this, false);
+	});
+}
+
+function commitDeductionDefaults() {
+	$('.deduction_amount_input', window.document).each(function() {
+		this.defaultValue = this.value;
+	});
+	$('.deduction_manual_checkbox', window.document).each(function() {
+		this.defaultChecked = this.checked;
+	});
+}
+
 function showSaveNotice(message) {
 	var noticeWindow = window;
 	var noticeDocument = window.document;
@@ -1438,6 +1584,7 @@ function setCancel() {
 	$('#close', window.document).removeClass("display_none");
 	$('#cancel', window.document).addClass("display_none");
 	document.forms[0].reset();
+	refreshDeductionSources();
 }
 
 function setSave() {

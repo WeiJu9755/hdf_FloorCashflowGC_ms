@@ -605,12 +605,29 @@ function normalize_gc_price_base_date($base_date) {
  * 依欄位前綴與序號讀取 CasePricingGC_sub 設定，計算對應階段的預計收款日。
  */
 function calculate_expected_receiving_payment_date_by_prefix($completion_date, $row, $prefix, $seq, $auto_delivery_date = "", $auto_grouting_date = "") {
+	$stage_percentage_key = ($prefix == "fp") ? "first_percentage" : "second_percentage";
+	$receiving_percentage_key = $prefix . "_receiving_payment_percent_" . $seq;
+
+	// 未設定該計價階段或收款期別時，不應以空白條件產生預設日期。
+	$stage_percentage = isset($row[$stage_percentage_key]) ? floatval($row[$stage_percentage_key]) : 0;
+	$receiving_percentage = isset($row[$receiving_percentage_key]) ? floatval($row[$receiving_percentage_key]) : 0;
+	if ($stage_percentage <= 0 || $receiving_percentage <= 0) {
+		return "";
+	}
+
+	$cutoff_month_a = isset($row[$prefix . "_cutoff_month_" . $seq . "a"]) ? $row[$prefix . "_cutoff_month_" . $seq . "a"] : "";
+	$deadline_a = isset($row[$prefix . "_deadline_" . $seq . "a"]) ? $row[$prefix . "_deadline_" . $seq . "a"] : "";
+	$payment_date_a = isset($row[$prefix . "_payment_date_" . $seq . "a"]) ? $row[$prefix . "_payment_date_" . $seq . "a"] : "";
+	if (trim((string)$cutoff_month_a) == "" || trim((string)$deadline_a) == "" || trim((string)$payment_date_a) == "") {
+		return "";
+	}
+
 	$date = calculate_expected_receiving_payment_date(
 		$completion_date,
-		isset($row[$prefix . "_cutoff_month_" . $seq . "a"]) ? $row[$prefix . "_cutoff_month_" . $seq . "a"] : "",
-		isset($row[$prefix . "_deadline_" . $seq . "a"]) ? $row[$prefix . "_deadline_" . $seq . "a"] : "",
+		$cutoff_month_a,
+		$deadline_a,
 		isset($row[$prefix . "_payment_months_" . $seq . "a"]) ? $row[$prefix . "_payment_months_" . $seq . "a"] : "",
-		isset($row[$prefix . "_payment_date_" . $seq . "a"]) ? $row[$prefix . "_payment_date_" . $seq . "a"] : "",
+		$payment_date_a,
 		isset($row[$prefix . "_payment_days_" . $seq . "a"]) ? $row[$prefix . "_payment_days_" . $seq . "a"] : 0,
 		isset($row[$prefix . "_cutoff_month_" . $seq . "b"]) ? $row[$prefix . "_cutoff_month_" . $seq . "b"] : "",
 		isset($row[$prefix . "_deadline_" . $seq . "b"]) ? $row[$prefix . "_deadline_" . $seq . "b"] : "",

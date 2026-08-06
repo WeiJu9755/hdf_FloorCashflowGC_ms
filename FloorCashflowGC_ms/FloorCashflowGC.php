@@ -435,6 +435,19 @@ $list_view
 			"searching": true,  //禁用原生搜索
 			"ordering": false,
 			"ajaxSource": "/smarty/templates/$site_db/$templates/sub_modal/project/func07/FloorCashflowGC_ms/server_FloorCashflowGC.php?site_db=$site_db&fm=$fm",
+			"fnServerParams": function (aoData) {
+				aoData.push({
+					"name": "only_completed",
+					"value": $('#only_completed').is(':checked') ? '1' : '0'
+				});
+			},
+			"fnInitComplete": function () {
+				var completedFilter = $('<div class="form-check form-check-inline ms-3 mb-0"><input class="form-check-input" type="checkbox" id="only_completed"><label class="form-check-label size14 weight text-nowrap" for="only_completed">只顯示已完工</label></div>');
+				$('#db_table_length').append(completedFilter);
+				$('#only_completed').on('change', function () {
+					$('#db_table').dataTable().fnDraw();
+				});
+			},
 			"language": {
 						"sUrl": "$dataTable_de"
 						/*"sUrl": '//cdn.datatables.net/plug-ins/1.12.1/i18n/zh-HANT.json'*/

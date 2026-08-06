@@ -147,7 +147,12 @@
 	 
 
 
-	$statusWhere = "(a.status1 = '已簽約' OR a.status1 = '已結案' OR (a.status1 = '未簽約' AND a.status2 = '已回簽'))";
+	$onlyCompleted = isset($_GET['only_completed']) && $_GET['only_completed'] == '1';
+	if ($onlyCompleted) {
+		$statusWhere = "a.status1 = '已完工'";
+	} else {
+		$statusWhere = "(a.status1 = '已簽約' OR a.status1 = '已完工' OR (a.status1 = '未簽約' AND a.status2 = '已回簽'))";
+	}
 	if ($sWhere == "") {
 		$sWhere = "WHERE $statusWhere";
 	} else {
