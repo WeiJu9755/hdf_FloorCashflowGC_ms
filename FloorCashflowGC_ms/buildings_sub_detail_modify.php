@@ -48,6 +48,8 @@ function processform($aFormValues){
 	$advance_payment_deduction_source	= deduction_source_from_checkbox($aFormValues, 'advance_payment_deduction_source_manual');
 	$second_retention_deduction_source	= deduction_source_from_checkbox($aFormValues, 'second_retention_deduction_source_manual');
 	$second_advance_payment_deduction_source = deduction_source_from_checkbox($aFormValues, 'second_advance_payment_deduction_source_manual');
+	$first_actual_collection_amount_source = normalize_collection_source(isset($aFormValues['first_actual_collection_amount_source']) ? $aFormValues['first_actual_collection_amount_source'] : 'auto');
+	$second_actual_collection_amount_source = normalize_collection_source(isset($aFormValues['second_actual_collection_amount_source']) ? $aFormValues['second_actual_collection_amount_source'] : 'auto');
 	$payment_request_stage				= trim($aFormValues['payment_request_stage']);
 	$remark								= trim($aFormValues['remark']);
 	
@@ -91,9 +93,6 @@ function processform($aFormValues){
 		? normalize_amount_for_sql($aFormValues['second_advance_payment_deduction_amount'])
 		: $actual_deduction_result['second_advance_payment_amount'];
 
-	$first_deduction_amount = floatval($retention_deduction_amount) + floatval($advance_payment_deduction_amount) + floatval($first_other_deduction_amount);
-	$second_deduction_amount = floatval($second_retention_deduction_amount) + floatval($second_advance_payment_deduction_amount) + floatval($second_other_deduction_amount);
-
 	$actual_collection_result = calculate_actual_collection_amounts(
 		$mDB,
 		$auto_seq,
@@ -101,8 +100,12 @@ function processform($aFormValues){
 		floatval($second_actual_completed_qty),
 		floatval($first_layout_actual_completed_qty),
 		floatval($second_layout_actual_completed_qty),
-		$first_deduction_amount,
-		$second_deduction_amount
+		floatval($retention_deduction_amount),
+		floatval($advance_payment_deduction_amount),
+		floatval($first_other_deduction_amount),
+		floatval($second_retention_deduction_amount),
+		floatval($second_advance_payment_deduction_amount),
+		floatval($second_other_deduction_amount)
 	);
 	if (!$actual_collection_result['ok']) {
 		$mDB->remove();
@@ -110,6 +113,13 @@ function processform($aFormValues){
 		$objResponse->script("jAlert('警示', '$error_message', 'red', '', 2500);");
 		return $objResponse;
 	}
+	$first_actual_collection_amount = ($first_actual_collection_amount_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['first_actual_collection_amount'])
+		: $actual_collection_result['parts'][0];
+	$second_actual_collection_amount = ($second_actual_collection_amount_source == 'manual')
+		? normalize_amount_for_sql($aFormValues['second_actual_collection_amount'])
+		: $actual_collection_result['parts'][2];
+	$actual_collection_amount = number_format(floatval($first_actual_collection_amount) + floatval($second_actual_collection_amount), 2, '.', '');
 
 	updateFloorCashflowGCModifyLogByDetailSeq($mDB, $auto_seq, $memberID);
 
@@ -124,12 +134,16 @@ function processform($aFormValues){
 			,second_actual_completed_qty	= $second_actual_completed_qty
 			,first_layout_actual_completed_qty	= $first_layout_actual_completed_qty
 			,second_layout_actual_completed_qty	= $second_layout_actual_completed_qty
-			,actual_collection_amount	= ".$actual_collection_result['total_amount']."
+			,actual_collection_amount	= $actual_collection_amount
 			,first_actual_billing_amount	= ".$actual_collection_result['first_actual_billing_amount']."
 			,second_actual_billing_amount	= ".$actual_collection_result['second_actual_billing_amount']."
-			,first_actual_collection_amount	= ".$actual_collection_result['parts'][0]."
+			,first_actual_invoice_amount	= ".$actual_collection_result['first_actual_invoice_amount']."
+			,second_actual_invoice_amount	= ".$actual_collection_result['second_actual_invoice_amount']."
+			,first_actual_collection_amount	= $first_actual_collection_amount
+			,first_actual_collection_amount_source	= '$first_actual_collection_amount_source'
 			,first_layout_actual_collection_amount	= ".$actual_collection_result['parts'][1]."
-			,second_actual_collection_amount	= ".$actual_collection_result['parts'][2]."
+			,second_actual_collection_amount	= $second_actual_collection_amount
+			,second_actual_collection_amount_source	= '$second_actual_collection_amount_source'
 			,second_layout_actual_collection_amount	= ".$actual_collection_result['parts'][3]."
 			,first_actual_collection_date	= '$first_actual_collection_date'
 			,first_layout_actual_collection_date	= '$first_layout_actual_collection_date'
@@ -158,13 +172,16 @@ function processform($aFormValues){
 	$objResponse->script("showSaveNotice('已存檔!');");
 	$objResponse->script("$('#first_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['first_actual_billing_amount']), 2)."');");
 	$objResponse->script("$('#second_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_billing_amount']), 2)."');");
-	$objResponse->script("$('#first_actual_collection_amount_preview').text('".number_format(floatval($actual_collection_result['parts'][0]), 2)."');");
-	$objResponse->script("$('#second_actual_collection_amount_preview').text('".number_format(floatval($actual_collection_result['parts'][2]), 2)."');");
+	$objResponse->script("$('#first_actual_invoice_amount_preview').val('".number_format(floatval($actual_collection_result['first_actual_invoice_amount']), 2)."');");
+	$objResponse->script("$('#second_actual_invoice_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_invoice_amount']), 2)."');");
+	$objResponse->script("$('#first_actual_collection_amount').val('".number_format(floatval($first_actual_collection_amount), 2, '.', '')."');");
+	$objResponse->script("$('#second_actual_collection_amount').val('".number_format(floatval($second_actual_collection_amount), 2, '.', '')."');");
 	$objResponse->script("$('#retention_deduction_amount').val('".number_format(floatval($retention_deduction_amount), 2, '.', '')."');");
 	$objResponse->script("$('#advance_payment_deduction_amount').val('".number_format(floatval($advance_payment_deduction_amount), 2, '.', '')."');");
 	$objResponse->script("$('#second_retention_deduction_amount').val('".number_format(floatval($second_retention_deduction_amount), 2, '.', '')."');");
 	$objResponse->script("$('#second_advance_payment_deduction_amount').val('".number_format(floatval($second_advance_payment_deduction_amount), 2, '.', '')."');");
 	$objResponse->script("commitDeductionDefaults();");
+	$objResponse->script("commitCollectionDefaults();");
 	$objResponse->script("if (parent && typeof parent.buildings_sub_detail_myDraw == 'function') { parent.buildings_sub_detail_myDraw(); }");
 		
 	
@@ -183,6 +200,10 @@ function normalize_deduction_source($value) {
 	return (strtolower(trim((string)$value)) == 'manual') ? 'manual' : 'auto';
 }
 
+function normalize_collection_source($value) {
+	return (strtolower(trim((string)$value)) == 'manual') ? 'manual' : 'auto';
+}
+
 function deduction_source_from_checkbox($form_values, $field_name) {
 	return (isset($form_values[$field_name]) && (string)$form_values[$field_name] == '1') ? 'manual' : 'auto';
 }
@@ -190,7 +211,7 @@ function deduction_source_from_checkbox($form_values, $field_name) {
 /**
  * 依樓層類型取得標準/屋突與放樣單價，計價與放樣合併後再扣除該次扣抵款。
  */
-function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_deduction_amount, $second_deduction_amount) {
+function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_retention_amount, $first_advance_payment_amount, $first_other_deduction_amount, $second_retention_amount, $second_advance_payment_amount, $second_other_deduction_amount) {
 	$auto_seq_sql = addslashes($auto_seq);
 	$Qry="SELECT
 			 a.floor,
@@ -229,15 +250,21 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 	$second_qty = max(0, floatval($second_actual_completed_qty));
 	$first_layout_qty = max(0, floatval($first_layout_actual_completed_qty));
 	$second_layout_qty = max(0, floatval($second_layout_actual_completed_qty));
-	$first_deduction_amount = floatval($first_deduction_amount);
-	$second_deduction_amount = floatval($second_deduction_amount);
+	$first_retention_amount = floatval($first_retention_amount);
+	$first_advance_payment_amount = floatval($first_advance_payment_amount);
+	$first_other_deduction_amount = floatval($first_other_deduction_amount);
+	$second_retention_amount = floatval($second_retention_amount);
+	$second_advance_payment_amount = floatval($second_advance_payment_amount);
+	$second_other_deduction_amount = floatval($second_other_deduction_amount);
 	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
 	$first_actual_billing_amount = round((($unit_price * $first_qty) + ($layout_unit_price * $first_layout_qty)) * $tax_multiplier, 2);
 	$second_actual_billing_amount = round((($unit_price * $second_qty) + ($layout_unit_price * $second_layout_qty)) * $tax_multiplier, 2);
+	$first_actual_invoice_amount = round($first_actual_billing_amount - $first_advance_payment_amount - $first_other_deduction_amount, 2);
+	$second_actual_invoice_amount = round($second_actual_billing_amount - $second_advance_payment_amount - $second_other_deduction_amount, 2);
 	$parts = array(
-		round($first_actual_billing_amount - $first_deduction_amount, 2),
+		round($first_actual_invoice_amount - $first_retention_amount, 2),
 		0,
-		round($second_actual_billing_amount - $second_deduction_amount, 2),
+		round($second_actual_invoice_amount - $second_retention_amount, 2),
 		0
 	);
 	$total_amount = round(array_sum($parts), 2);
@@ -247,6 +274,8 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 		'total_amount' => number_format($total_amount, 2, '.', ''),
 		'first_actual_billing_amount' => number_format($first_actual_billing_amount, 2, '.', ''),
 		'second_actual_billing_amount' => number_format($second_actual_billing_amount, 2, '.', ''),
+		'first_actual_invoice_amount' => number_format($first_actual_invoice_amount, 2, '.', ''),
+		'second_actual_invoice_amount' => number_format($second_actual_invoice_amount, 2, '.', ''),
 		'parts' => array(
 			number_format($parts[0], 2, '.', ''),
 			number_format($parts[1], 2, '.', ''),
@@ -443,10 +472,14 @@ $first_layout_actual_completed_qty = "";
 $second_layout_actual_completed_qty = "";
 $first_actual_billing_amount = "";
 $second_actual_billing_amount = "";
+$first_actual_invoice_amount = "";
+$second_actual_invoice_amount = "";
 $actual_collection_amount = "";
 $first_actual_collection_amount = "";
+$first_actual_collection_amount_source = "auto";
 $first_layout_actual_collection_amount = "";
 $second_actual_collection_amount = "";
+$second_actual_collection_amount_source = "auto";
 $second_layout_actual_collection_amount = "";
 $actual_collection_date = "";
 $first_actual_collection_date = "";
@@ -508,10 +541,14 @@ if ($total > 0) {
 	$second_layout_actual_completed_qty = $row['second_layout_actual_completed_qty'];
 	$first_actual_billing_amount = $row['first_actual_billing_amount'];
 	$second_actual_billing_amount = $row['second_actual_billing_amount'];
+	$first_actual_invoice_amount = $row['first_actual_invoice_amount'];
+	$second_actual_invoice_amount = $row['second_actual_invoice_amount'];
 	$actual_collection_amount = $row['actual_collection_amount'];
 	$first_actual_collection_amount = $row['first_actual_collection_amount'];
+	$first_actual_collection_amount_source = normalize_collection_source($row['first_actual_collection_amount_source']);
 	$first_layout_actual_collection_amount = $row['first_layout_actual_collection_amount'];
 	$second_actual_collection_amount = $row['second_actual_collection_amount'];
+	$second_actual_collection_amount_source = normalize_collection_source($row['second_actual_collection_amount_source']);
 	$second_layout_actual_collection_amount = $row['second_layout_actual_collection_amount'];
 	$actual_collection_date = $row['actual_collection_date'];
 	$first_actual_collection_date = $row['first_actual_collection_date'];
@@ -540,7 +577,7 @@ if ($first_layout_actual_completed_qty == "" && $second_layout_actual_completed_
 	$second_layout_actual_completed_qty = $second_actual_completed_qty;
 }
 
-if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "") && ($first_actual_completed_qty != "" || $second_actual_completed_qty != "")) {
+if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "" || $first_actual_invoice_amount == "" || $second_actual_invoice_amount == "") && ($first_actual_completed_qty != "" || $second_actual_completed_qty != "")) {
 	$preview_collection_result = calculate_actual_collection_amounts(
 		$mDB,
 		$auto_seq,
@@ -548,8 +585,12 @@ if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "") 
 		floatval($second_actual_completed_qty),
 		floatval($first_layout_actual_completed_qty),
 		floatval($second_layout_actual_completed_qty),
-		floatval($retention_deduction_amount) + floatval($advance_payment_deduction_amount) + floatval($first_other_deduction_amount),
-		floatval($second_retention_deduction_amount) + floatval($second_advance_payment_deduction_amount) + floatval($second_other_deduction_amount)
+		floatval($retention_deduction_amount),
+		floatval($advance_payment_deduction_amount),
+		floatval($first_other_deduction_amount),
+		floatval($second_retention_deduction_amount),
+		floatval($second_advance_payment_deduction_amount),
+		floatval($second_other_deduction_amount)
 	);
 	if ($preview_collection_result['ok']) {
 		if ($first_actual_billing_amount == "") {
@@ -557,6 +598,12 @@ if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "") 
 		}
 		if ($second_actual_billing_amount == "") {
 			$second_actual_billing_amount = $preview_collection_result['second_actual_billing_amount'];
+		}
+		if ($first_actual_invoice_amount == "") {
+			$first_actual_invoice_amount = $preview_collection_result['first_actual_invoice_amount'];
+		}
+		if ($second_actual_invoice_amount == "") {
+			$second_actual_invoice_amount = $preview_collection_result['second_actual_invoice_amount'];
 		}
 	}
 }
@@ -579,6 +626,8 @@ $show_second_advance_payment_deduction_amount = ($second_advance_payment_deducti
 $show_second_other_deduction_amount = ($second_other_deduction_amount != "" && $second_other_deduction_amount != 0) ? number_format($second_other_deduction_amount, 2) : "";
 $show_first_actual_billing_amount = ($first_actual_billing_amount != "" && $first_actual_billing_amount != 0) ? number_format($first_actual_billing_amount, 2) : "";
 $show_second_actual_billing_amount = ($second_actual_billing_amount != "" && $second_actual_billing_amount != 0) ? number_format($second_actual_billing_amount, 2) : "";
+$show_first_actual_invoice_amount = number_format(floatval($first_actual_invoice_amount), 2);
+$show_second_actual_invoice_amount = number_format(floatval($second_actual_invoice_amount), 2);
 $show_expected_collection_amount = "
 	<div class=\"summary_line\"><span>第一次金額：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
 	<div class=\"summary_line\"><span>第二次金額：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
@@ -637,19 +686,43 @@ $show_actual_billing_date_inputs = "
 
 $show_first_actual_collection_amount = number_format(floatval($first_actual_collection_amount) + floatval($first_layout_actual_collection_amount), 2);
 $show_second_actual_collection_amount = number_format(floatval($second_actual_collection_amount) + floatval($second_layout_actual_collection_amount), 2);
+$first_collection_source_label = ($first_actual_collection_amount_source == 'manual') ? '手動' : '自動';
+$second_collection_source_label = ($second_actual_collection_amount_source == 'manual') ? '手動' : '自動';
+
+$show_actual_invoice_amount_inputs = "
+	<div class=\"actual_amount_grid\">
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第一次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<input type=\"text\" class=\"form-control actual_field\" id=\"first_actual_invoice_amount_preview\" value=\"$show_first_actual_invoice_amount\" readonly>
+		</div>
+		<div class=\"actual_amount_card\">
+			<div class=\"actual_amount_card_header\"><span>第二次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
+			<input type=\"text\" class=\"form-control actual_field\" id=\"second_actual_invoice_amount_preview\" value=\"$show_second_actual_invoice_amount\" readonly>
+		</div>
+	</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 實開發票金額 = 實際金額 − 扣抵預收款 − 其他扣抵款。</div>
+";
 
 $show_actual_collection_amount_inputs = "
 	<div class=\"actual_amount_grid\">
 		<div class=\"actual_amount_card\">
-			<div class=\"actual_amount_card_header\"><span>第一次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
-			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong id=\"first_actual_collection_amount_preview\">$show_first_actual_collection_amount</strong></div>
+			<div class=\"actual_amount_card_header\"><span>第一次金額</span><span class=\"collection_source_badge\" id=\"first_actual_collection_amount_source_label\">$first_collection_source_label</span></div>
+			<div class=\"collection_amount_input_row\">
+				<input type=\"number\" class=\"form-control actual_field collection_amount_input\" id=\"first_actual_collection_amount\" name=\"first_actual_collection_amount\" value=\"".number_format(floatval($first_actual_collection_amount) + floatval($first_layout_actual_collection_amount), 2, '.', '')."\" step=\"0.01\" data-source-target=\"first_actual_collection_amount_source\" oninput=\"markCollectionManual(this);\" onchange=\"setEdit();\">
+				<button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" onclick=\"resetCollectionAuto('first_actual_collection_amount');\">恢復自動</button>
+			</div>
+			<input type=\"hidden\" id=\"first_actual_collection_amount_source\" name=\"first_actual_collection_amount_source\" value=\"$first_actual_collection_amount_source\">
 		</div>
 		<div class=\"actual_amount_card\">
-			<div class=\"actual_amount_card_header\"><span>第二次金額</span><span class=\"amount_lock\" title=\"系統自動計算，不可修改\"><i class=\"bi bi-lock-fill\"></i></span></div>
-			<div class=\"actual_amount_value\"><span class=\"currency\">NT$</span><strong id=\"second_actual_collection_amount_preview\">$show_second_actual_collection_amount</strong></div>
+			<div class=\"actual_amount_card_header\"><span>第二次金額</span><span class=\"collection_source_badge\" id=\"second_actual_collection_amount_source_label\">$second_collection_source_label</span></div>
+			<div class=\"collection_amount_input_row\">
+				<input type=\"number\" class=\"form-control actual_field collection_amount_input\" id=\"second_actual_collection_amount\" name=\"second_actual_collection_amount\" value=\"".number_format(floatval($second_actual_collection_amount) + floatval($second_layout_actual_collection_amount), 2, '.', '')."\" step=\"0.01\" data-source-target=\"second_actual_collection_amount_source\" oninput=\"markCollectionManual(this);\" onchange=\"setEdit();\">
+				<button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" onclick=\"resetCollectionAuto('second_actual_collection_amount');\">恢復自動</button>
+			</div>
+			<input type=\"hidden\" id=\"second_actual_collection_amount_source\" name=\"second_actual_collection_amount_source\" value=\"$second_actual_collection_amount_source\">
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 存檔時依樓層類型的標準/屋突單價、放樣單價、第一次/第二次實際數量與各次扣抵款自動計算；放樣金額併入第一次/第二次金額。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 預設依公式自動計算；手動修改後會保留輸入值，不再受自動公式影響。</div>
 ";
 
 $show_deduction_amount_inputs = "
@@ -1116,6 +1189,32 @@ $style_css=<<<EOT
 	line-height: 1.5;
 }
 
+.collection_amount_input_row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
+	align-items: center;
+}
+
+.collection_amount_input_row .btn {
+	width: auto;
+	justify-self: end;
+	white-space: nowrap;
+}
+
+.collection_source_badge {
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: #e0f2fe;
+	color: #0369a1;
+	font-size: 11px;
+}
+
+.collection_source_badge.is_manual {
+	background: #fef3c7;
+	color: #92400e;
+}
+
 </style>
 
 EOT;
@@ -1482,6 +1581,32 @@ $style_css=<<<EOT
 	line-height: 1.5;
 }
 
+.collection_amount_input_row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
+	align-items: center;
+}
+
+.collection_amount_input_row .btn {
+	width: auto;
+	justify-self: end;
+	white-space: nowrap;
+}
+
+.collection_source_badge {
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: #e0f2fe;
+	color: #0369a1;
+	font-size: 11px;
+}
+
+.collection_source_badge.is_manual {
+	background: #fef3c7;
+	color: #92400e;
+}
+
 </style>
 EOT;
 
@@ -1599,16 +1724,20 @@ $style_css
 								$show_actual_billing_date_inputs
 							</div>
 							<div class="cashflow_edit_panel">
-								<div class="cashflow_panel_title"><i class="bi bi-cash-coin"></i><span>實際收款金額</span></div>
-								$show_actual_collection_amount_inputs
-							</div>
-							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>實際扣抵金額</span></div>
 								$show_deduction_amount_inputs
 							</div>
 							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-calendar-event"></i><span>實際收款日</span></div>
 								$show_actual_collection_date_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-receipt"></i><span>實開發票金額(含稅)</span></div>
+								$show_actual_invoice_amount_inputs
+							</div>
+							<div class="cashflow_edit_panel">
+								<div class="cashflow_panel_title"><i class="bi bi-cash-coin"></i><span>實際收款金額(含稅)</span></div>
+								$show_actual_collection_amount_inputs
 							</div>
 							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-list-check"></i><span>階段與備註</span></div>
@@ -1674,6 +1803,46 @@ function commitDeductionDefaults() {
 	$('.deduction_manual_checkbox', window.document).each(function() {
 		this.defaultChecked = this.checked;
 	});
+}
+
+function setCollectionSourceState(amountId, sourceValue) {
+	var sourceInput = document.getElementById(amountId + '_source');
+	var sourceLabel = document.getElementById(amountId + '_source_label');
+	if (sourceInput) {
+		sourceInput.value = sourceValue;
+	}
+	if (sourceLabel) {
+		sourceLabel.textContent = (sourceValue == 'manual') ? '手動' : '自動';
+		sourceLabel.classList.toggle('is_manual', sourceValue == 'manual');
+	}
+}
+
+function markCollectionManual(amountInput) {
+	setCollectionSourceState(amountInput.id, 'manual');
+	setEdit();
+}
+
+function resetCollectionAuto(amountId) {
+	setCollectionSourceState(amountId, 'auto');
+	setEdit();
+}
+
+function refreshCollectionSources() {
+	$('.collection_amount_input', window.document).each(function() {
+		var sourceInput = document.getElementById(this.id + '_source');
+		setCollectionSourceState(this.id, sourceInput && sourceInput.value == 'manual' ? 'manual' : 'auto');
+	});
+}
+
+function commitCollectionDefaults() {
+	$('.collection_amount_input', window.document).each(function() {
+		this.defaultValue = this.value;
+		var sourceInput = document.getElementById(this.id + '_source');
+		if (sourceInput) {
+			sourceInput.defaultValue = sourceInput.value;
+		}
+	});
+	refreshCollectionSources();
 }
 
 function showSaveNotice(message) {
@@ -1770,12 +1939,17 @@ function setCancel() {
 	$('#cancel', window.document).addClass("display_none");
 	document.forms[0].reset();
 	refreshDeductionSources();
+	refreshCollectionSources();
 }
 
 function setSave() {
 	$('#close', window.document).removeClass("display_none");
 	$('#cancel', window.document).addClass("display_none");
 }
+
+$(function() {
+	refreshCollectionSources();
+});
 
 </script>
 EOT;
