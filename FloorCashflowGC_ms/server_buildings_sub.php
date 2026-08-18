@@ -14,7 +14,7 @@
 	 * you want to insert a non-database field (for example a counter or static image)
 	 */
 	$aColumns = array( 'a.auto_seq','a.case_id','a.building','a.scheduled_entry_date','a.actual_entry_date','a.construction_days_first_floor','a.construction_days_per_floor','a.std_layer_floor','a.std_layer_qty','a.roof_protrusion_floor','a.roof_protrusion_qty','a.layout_std_layer_qty','a.layout_roof_protrusion_qty','a.outsourcing','a.makeby'
-	,'a.last_modify');
+	,'a.last_modify','c.std_floor_u_price','c.roof_protrusion_u_price','c.layout_std_floor_u_price','c.square_roof_protrusion_u_price');
 	
 	/* Indexed column (used for fast and accurate table cardinality) */
 	$sIndexColumn = "auto_seq";
@@ -125,6 +125,7 @@
 	$sQuery = "
 		SELECT SQL_CALC_FOUND_ROWS ".str_replace(" , ", " ", implode(", ", $aColumns))."
 		FROM   $sTable a
+		LEFT JOIN CaseManagement c ON c.case_id = a.case_id
 		$sWhere
 		$sOrder
 		$sLimit

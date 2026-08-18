@@ -406,6 +406,10 @@ $building = "";
 $floor = "";
 $expected_actual_delivery_date = "";
 $expected_actual_grouting_date = "";
+$first_expected_work_qty = "";
+$first_layout_expected_work_qty = "";
+$second_expected_work_qty = "";
+$second_layout_expected_work_qty = "";
 $first_expected_collection_amount = "";
 $first_layout_expected_collection_amount = "";
 $second_expected_collection_amount = "";
@@ -467,6 +471,10 @@ if ($total > 0) {
 	$floor = $row['floor'];
 	$expected_actual_delivery_date = $row['expected_actual_delivery_date'];
 	$expected_actual_grouting_date = $row['expected_actual_grouting_date'];
+	$first_expected_work_qty = $row['first_expected_work_qty'];
+	$first_layout_expected_work_qty = $row['first_layout_expected_work_qty'];
+	$second_expected_work_qty = $row['second_expected_work_qty'];
+	$second_layout_expected_work_qty = $row['second_layout_expected_work_qty'];
 	$first_expected_collection_amount = $row['first_expected_collection_amount'];
 	$first_layout_expected_collection_amount = $row['first_layout_expected_collection_amount'];
 	$second_expected_collection_amount = $row['second_expected_collection_amount'];
@@ -559,6 +567,10 @@ $show_first_expected_collection_amount = ($first_expected_collection_amount != "
 $show_first_layout_expected_collection_amount = ($first_layout_expected_collection_amount != "" && $first_layout_expected_collection_amount != 0) ? number_format($first_layout_expected_collection_amount, 2) : "";
 $show_second_expected_collection_amount = ($second_expected_collection_amount != "" && $second_expected_collection_amount != 0) ? number_format($second_expected_collection_amount, 2) : "";
 $show_second_layout_expected_collection_amount = ($second_layout_expected_collection_amount != "" && $second_layout_expected_collection_amount != 0) ? number_format($second_layout_expected_collection_amount, 2) : "";
+$show_first_expected_work_qty = ($first_expected_work_qty !== "" && $first_expected_work_qty !== null) ? number_format($first_expected_work_qty, 2) : "";
+$show_first_layout_expected_work_qty = ($first_layout_expected_work_qty !== "" && $first_layout_expected_work_qty !== null) ? number_format($first_layout_expected_work_qty, 2) : "";
+$show_second_expected_work_qty = ($second_expected_work_qty !== "" && $second_expected_work_qty !== null) ? number_format($second_expected_work_qty, 2) : "";
+$show_second_layout_expected_work_qty = ($second_layout_expected_work_qty !== "" && $second_layout_expected_work_qty !== null) ? number_format($second_layout_expected_work_qty, 2) : "";
 $show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
 $show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
 $show_first_other_deduction_amount = ($first_other_deduction_amount != "" && $first_other_deduction_amount != 0) ? number_format($first_other_deduction_amount, 2) : "";
@@ -755,6 +767,67 @@ $style_css=<<<EOT
 	margin-bottom: 12px;
 }
 
+.basic_section_title {
+	font-size: 26px;
+	margin-bottom: 18px;
+}
+
+.basic_overview_grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-rows: repeat(6, auto);
+	column-gap: 24px;
+	row-gap: 0;
+}
+
+.basic_overview_column {
+	display: grid;
+	grid-template-rows: subgrid;
+	grid-row: 1 / span 6;
+	align-content: start;
+}
+
+.basic_overview_column:first-child {
+	grid-column: 1;
+}
+
+.basic_overview_column:last-child {
+	grid-column: 2;
+}
+
+.basic_overview_section {
+	padding: 12px 14px;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+.basic_overview_section:last-child {
+	border-bottom: 0;
+}
+
+.basic_overview_section.basic_overview_no_bottom_border {
+	border-bottom: 0;
+}
+
+.basic_overview_heading {
+	padding-bottom: 6px;
+	font-size: 15px;
+	font-weight: 700;
+	color: #0b5f75;
+}
+
+.basic_deduction_list {
+	display: grid;
+	gap: 8px;
+}
+
+.basic_actual_qty {
+	margin-top: 14px;
+	padding: 12px 14px;
+	border: 1px solid #d8e2ea;
+	border-radius: 10px;
+	background: #fbfdff;
+}
+
 .readonly_grid,
 .edit_grid {
 	display: grid;
@@ -800,6 +873,24 @@ $style_css=<<<EOT
 	padding: 2px 0;
 }
 
+.overview_pair_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px 16px;
+}
+
+.overview_pair_item .actual_label {
+	margin-bottom: 1px;
+}
+
+.overview_pair_value {
+	min-height: 24px;
+	padding: 2px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+}
+
 .field_value_main {
 	color: #0d6efd;
 }
@@ -834,6 +925,21 @@ $style_css=<<<EOT
 .summary_gap {
 	display: inline-block;
 	width: 18px;
+}
+
+.basic_overview_section .summary_line {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+	gap: 4px 8px;
+	white-space: normal;
+}
+
+.basic_overview_section .summary_line b {
+	min-width: 0;
+}
+
+.basic_overview_section .summary_gap {
+	display: none;
 }
 
 .actual_grid {
@@ -1056,6 +1162,55 @@ $style_css=<<<EOT
 	margin-bottom: 12px;
 }
 
+.basic_section_title {
+	font-size: 23px;
+	margin-bottom: 16px;
+}
+
+.basic_overview_grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 14px;
+}
+
+.basic_overview_column {
+	display: grid;
+	grid-template-columns: 1fr;
+}
+
+.basic_overview_section {
+	padding: 11px 12px;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+.basic_overview_section:last-child {
+	border-bottom: 0;
+}
+
+.basic_overview_section.basic_overview_no_bottom_border {
+	border-bottom: 0;
+}
+
+.basic_overview_heading {
+	padding-bottom: 5px;
+	font-size: 15px;
+	font-weight: 700;
+	color: #0b5f75;
+}
+
+.basic_deduction_list {
+	display: grid;
+	gap: 8px;
+}
+
+.basic_actual_qty {
+	margin-top: 14px;
+	padding: 11px 12px;
+	border: 1px solid #d8e2ea;
+	border-radius: 10px;
+	background: #fbfdff;
+}
+
 .readonly_grid,
 .edit_grid {
 	display: grid;
@@ -1101,6 +1256,24 @@ $style_css=<<<EOT
 	padding: 2px 0;
 }
 
+.overview_pair_grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px 12px;
+}
+
+.overview_pair_item .actual_label {
+	margin-bottom: 1px;
+}
+
+.overview_pair_value {
+	min-height: 24px;
+	padding: 2px 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #111;
+}
+
 .field_value_main {
 	color: #0d6efd;
 }
@@ -1134,6 +1307,21 @@ $style_css=<<<EOT
 .summary_gap {
 	display: inline-block;
 	width: 18px;
+}
+
+.basic_overview_section .summary_line {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+	gap: 4px 6px;
+	white-space: normal;
+}
+
+.basic_overview_section .summary_line b {
+	min-width: 0;
+}
+
+.basic_overview_section .summary_gap {
+	display: none;
 }
 
 .actual_grid {
@@ -1317,67 +1505,65 @@ $style_css
 			<form method="post" id="modifyForm" name="modifyForm" enctype="multipart/form-data" action="javascript:void(null);">
 				<div class="field_container3">
 					<div class="modify_section">
-						<div class="section_title">基本資料</div>
-						<div class="readonly_grid">
-							<div class="readonly_item">
-								<div class="field_label">棟別</div>
-								<div class="field_value field_value_main">$building</div>
+						<div class="section_title basic_section_title">基本資料</div>
+						<div class="basic_overview_grid">
+							<div class="basic_overview_column">
+								<div class="basic_overview_section">
+									<div class="field_label">棟別</div>
+									<div class="field_value field_value_main">$building</div>
+								</div>
+								<div class="basic_overview_section overview_pair_grid">
+									<div class="overview_pair_item">
+										<div class="actual_label">預計+實際交版日期</div>
+										<div class="overview_pair_value">$expected_actual_delivery_date</div>
+									</div>
+									<div class="overview_pair_item">
+										<div class="actual_label">預計+實際灌漿日期</div>
+										<div class="overview_pair_value">$expected_actual_grouting_date</div>
+									</div>
+								</div>
+								<div class="basic_overview_section overview_pair_grid">
+									<div class="overview_pair_item">
+										<div class="actual_label">實際交版日</div>
+										<div class="overview_pair_value">$actual_submission_date</div>
+									</div>
+									<div class="overview_pair_item">
+										<div class="actual_label">實際灌漿日</div>
+										<div class="overview_pair_value">$actual_grouting_date</div>
+									</div>
+								</div>
+								<div class="basic_overview_section basic_overview_heading">預計收款日</div>
+								<div class="basic_overview_section field_value">$show_expected_collection_date</div>
+								<div class="basic_overview_section basic_deduction_list">
+									<div><div class="field_label">第一次扣抵保留/租賃預收差款</div><div class="field_value">$show_retention_deduction_amount</div></div>
+									<div><div class="field_label">第一次扣抵預收款</div><div class="field_value">$show_advance_payment_deduction_amount</div></div>
+									<div><div class="field_label">第一次其他扣抵款</div><div class="field_value">$show_first_other_deduction_amount</div></div>
+								</div>
 							</div>
-							<div class="readonly_item">
-								<div class="field_label">樓層</div>
-								<div class="field_value field_value_main">$floor</div>
+							<div class="basic_overview_column">
+								<div class="basic_overview_section">
+									<div class="field_label">樓層</div>
+									<div class="field_value field_value_main">$floor</div>
+								</div>
+								<div class="basic_overview_section basic_overview_heading basic_overview_no_bottom_border">預計計價與放樣數量</div>
+								<div class="basic_overview_section overview_pair_grid">
+									<div class="overview_pair_item"><div class="actual_label">第一次預計計價數量</div><div class="overview_pair_value">$show_first_expected_work_qty</div></div>
+									<div class="overview_pair_item"><div class="actual_label">第一次預計放樣數量</div><div class="overview_pair_value">$show_first_layout_expected_work_qty</div></div>
+									<div class="overview_pair_item"><div class="actual_label">第二次預計計價數量</div><div class="overview_pair_value">$show_second_expected_work_qty</div></div>
+									<div class="overview_pair_item"><div class="actual_label">第二次預計放樣數量</div><div class="overview_pair_value">$show_second_layout_expected_work_qty</div></div>
+								</div>
+								<div class="basic_overview_section basic_overview_heading">預計收款金額</div>
+								<div class="basic_overview_section field_value">$show_expected_collection_amount</div>
+								<div class="basic_overview_section basic_deduction_list">
+									<div><div class="field_label">第二次扣抵保留/租賃預收差款</div><div class="field_value">$show_second_retention_deduction_amount</div></div>
+									<div><div class="field_label">第二次扣抵預收款</div><div class="field_value">$show_second_advance_payment_deduction_amount</div></div>
+									<div><div class="field_label">第二次其他扣抵款</div><div class="field_value">$show_second_other_deduction_amount</div></div>
+								</div>
 							</div>
-							<div class="readonly_item">
-								<div class="field_label">預計+實際交版日期</div>
-								<div class="field_value">$expected_actual_delivery_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">預計+實際灌漿日期</div>
-								<div class="field_value">$expected_actual_grouting_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">預計收款日</div>
-								<div class="field_value">$show_expected_collection_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">實際交版日</div>
-								<div class="field_value">$actual_submission_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">實際灌漿日</div>
-								<div class="field_value">$actual_grouting_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">預計收款金額</div>
-								<div class="field_value">$show_expected_collection_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第一次扣抵保留/租賃預收差款</div>
-								<div class="field_value">$show_retention_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第一次扣抵預收款</div>
-								<div class="field_value">$show_advance_payment_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第一次其他扣抵款</div>
-								<div class="field_value">$show_first_other_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第二次扣抵保留/租賃預收差款</div>
-								<div class="field_value">$show_second_retention_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第二次扣抵預收款</div>
-								<div class="field_value">$show_second_advance_payment_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">第二次其他扣抵款</div>
-								<div class="field_value">$show_second_other_deduction_amount</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">實際計價與放樣數量</div>
-								<div class="actual_grid actual_qty_grid">
+						</div>
+						<div class="basic_actual_qty readonly_item">
+							<div class="field_label">實際計價與放樣數量</div>
+							<div class="actual_grid actual_qty_grid">
 									<div>
 										<div class="actual_label">第一次實際計價數量</div>
 										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
@@ -1402,7 +1588,6 @@ $style_css
 										<div class="actual_label">第二次實際金額</div>
 										<input type="text" class="form-control actual_field" id="second_actual_billing_amount_preview" value="$show_second_actual_billing_amount" readonly />
 									</div>
-								</div>
 							</div>
 						</div>
 					</div>

@@ -120,6 +120,57 @@ a:active {
 	background-color: #f8f9fa;
 }
 
+.building-summary {
+	padding: 4px;
+	font-size: 13px;
+}
+
+.building-summary-group + .building-summary-group {
+	border-top: 1px solid #dee2e6;
+	margin-top: 5px;
+	padding-top: 5px;
+}
+
+.building-summary-title {
+	color: #000;
+	font-size: 12px;
+	font-weight: 700;
+	margin-bottom: 3px;
+}
+
+.building-summary-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 3px 12px;
+}
+
+.building-summary-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 4px;
+	min-width: 0;
+}
+
+.building-summary-label {
+	color: #555;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.building-summary-value {
+	color: #20809B;
+	font-weight: 700;
+	text-align: right;
+	word-break: break-word;
+}
+
+@media (max-width: 767px) {
+	.building-summary-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
 </style>
 
 $list_view
@@ -158,17 +209,27 @@ $list_view
 
 				$('td:eq(0)', nRow).html( '<div class="d-flex justify-content-center align-items-center size12 text-start" style="height:auto;min-height:32px;"><a href="javascript:void(0);" class="blue02 weight" onclick="'+buildings_sub_detail+'">'+engineering_overview+'</a></div>' );
 
-				//表格化
+				// 棟別摘要：以基本、數量與單價分組，減少左側列表的垂直長度。
 				var mtable = "";
-					mtable = '<div class="mytable w-100 size14 load-building-content" onclick="'+buildings_sub_detail+'">'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap w-75 px-1">標準層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[7]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[8]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層範圍：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[9]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">屋突層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[10]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">放樣標準層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[11]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">放樣屋突層數量(M2)：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[12]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">首層施作天數：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[5]+'</div></div>'
-						+'<div class="myrow w-100"><div class="mycell text-nowrap px-1">每層施作天數：</div><div class="mycell text-end px-1 text-nowrap blue02 weight">'+aData[6]+'</div></div>'
+					mtable = '<div class="building-summary load-building-content" onclick="'+buildings_sub_detail+'">'
+						+'<div class="building-summary-group"><div class="building-summary-title">基本資料</div><div class="building-summary-grid">'
+							+'<div class="building-summary-item"><span class="building-summary-label">標準層範圍</span><span class="building-summary-value">'+aData[7]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">屋突層範圍</span><span class="building-summary-value">'+aData[9]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">首層天數</span><span class="building-summary-value">'+aData[5]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">每層天數</span><span class="building-summary-value">'+aData[6]+'</span></div>'
+						+'</div></div>'
+						+'<div class="building-summary-group"><div class="building-summary-title">數量 (M2)</div><div class="building-summary-grid">'
+							+'<div class="building-summary-item"><span class="building-summary-label">標準層</span><span class="building-summary-value">'+aData[8]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">屋突層</span><span class="building-summary-value">'+aData[10]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">放樣標準層</span><span class="building-summary-value">'+aData[11]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">放樣屋突層</span><span class="building-summary-value">'+aData[12]+'</span></div>'
+						+'</div></div>'
+						+'<div class="building-summary-group"><div class="building-summary-title">單價 (元)</div><div class="building-summary-grid">'
+							+'<div class="building-summary-item"><span class="building-summary-label">標準層</span><span class="building-summary-value">'+aData[16]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">屋突層</span><span class="building-summary-value">'+aData[17]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">放樣標準層</span><span class="building-summary-value">'+aData[18]+'</span></div>'
+							+'<div class="building-summary-item"><span class="building-summary-label">放樣屋突層</span><span class="building-summary-value">'+aData[19]+'</span></div>'
+						+'</div></div>'
 						+'</div>';
 
 

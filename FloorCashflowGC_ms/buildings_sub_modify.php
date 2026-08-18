@@ -119,6 +119,11 @@ $builder_id = $overview_sub_row['builder_id'];
 $mDB = "";
 $mDB=new MywebDB();
 
+$std_floor_u_price = '';
+$roof_protrusion_u_price = '';
+$layout_std_floor_u_price = '';
+$square_roof_protrusion_u_price = '';
+
 //取得棟別
 $Qry="select * from buildings_sub where auto_seq = '$auto_seq' order by auto_seq";
 $mDB->query($Qry);
@@ -146,7 +151,11 @@ if (!empty($case_id)) {
 	$Qry="SELECT tot_std_contract_layers,
 				tot_houses_multi_floors,
 				layout_std_floor_total_qty,
-				layout_roof_protrusion_total_qty
+				layout_roof_protrusion_total_qty,
+				std_floor_u_price,
+				roof_protrusion_u_price,
+				layout_std_floor_u_price,
+				square_roof_protrusion_u_price
 			  FROM CaseManagement
 			 WHERE case_id = '$case_id_sql'
 			 LIMIT 1";
@@ -157,6 +166,10 @@ if (!empty($case_id)) {
 		$roof_protrusion_qty = $case_qty_row['tot_houses_multi_floors'];
 		$layout_std_layer_qty = $case_qty_row['layout_std_floor_total_qty'];
 		$layout_roof_protrusion_qty = $case_qty_row['layout_roof_protrusion_total_qty'];
+		$std_floor_u_price = $case_qty_row['std_floor_u_price'];
+		$roof_protrusion_u_price = $case_qty_row['roof_protrusion_u_price'];
+		$layout_std_floor_u_price = $case_qty_row['layout_std_floor_u_price'];
+		$square_roof_protrusion_u_price = $case_qty_row['square_roof_protrusion_u_price'];
 
 		$std_layer_qty_sql = addslashes($std_layer_qty);
 		$roof_protrusion_qty_sql = addslashes($roof_protrusion_qty);
@@ -226,6 +239,19 @@ $style_css=<<<EOT
 	font-weight: 700;
 	color: #0b5f75;
 	margin-bottom: 12px;
+}
+
+.basic_category + .basic_category {
+	border-top: 1px dashed #d7dee4;
+	margin-top: 14px;
+	padding-top: 14px;
+}
+
+.basic_category_title {
+	font-size: 15px;
+	font-weight: 700;
+	color: #333;
+	margin-bottom: 8px;
 }
 
 .readonly_grid,
@@ -318,6 +344,19 @@ $style_css=<<<EOT
 	margin-bottom: 12px;
 }
 
+.basic_category + .basic_category {
+	border-top: 1px dashed #d7dee4;
+	margin-top: 12px;
+	padding-top: 12px;
+}
+
+.basic_category_title {
+	font-size: 15px;
+	font-weight: 700;
+	color: #333;
+	margin-bottom: 8px;
+}
+
 .readonly_grid,
 .edit_grid {
 	display: grid;
@@ -381,38 +420,67 @@ $style_css
 				<div class="field_container3">
 					<div class="modify_section">
 						<div class="section_title">基本資料</div>
-						<div class="readonly_grid">
-							<div class="readonly_item">
-								<div class="field_label">棟別</div>
-								<div class="field_value field_value_main">$building</div>
+						<div class="basic_category">
+							<div class="basic_category_title">棟別概況</div>
+							<div class="readonly_grid">
+								<div class="readonly_item">
+									<div class="field_label">棟別</div>
+									<div class="field_value field_value_main">$building</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">代工數</div>
+									<div class="field_value">$outsourcing</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">本棟預計起始日</div>
+									<div class="field_value">$scheduled_entry_date</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">本棟實際起始日</div>
+									<div class="field_value">$actual_entry_date</div>
+								</div>
 							</div>
-							<div class="readonly_item">
-								<div class="field_label">代工數</div>
-								<div class="field_value">$outsourcing</div>
+						</div>
+						<div class="basic_category">
+							<div class="basic_category_title">施作設定</div>
+							<div class="readonly_grid">
+								<div class="readonly_item">
+									<div class="field_label">首層施作天數</div>
+									<div class="field_value">$construction_days_first_floor</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">每層施作天數</div>
+									<div class="field_value">$construction_days_per_floor</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">標準層範圍</div>
+									<div class="field_value">$std_layer_floor</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">屋突層範圍</div>
+									<div class="field_value">$roof_protrusion_floor</div>
+								</div>
 							</div>
-							<div class="readonly_item">
-								<div class="field_label">本棟預計起始日</div>
-								<div class="field_value">$scheduled_entry_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">本棟實際起始日</div>
-								<div class="field_value">$actual_entry_date</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">首層施作天數</div>
-								<div class="field_value">$construction_days_first_floor</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">每層施作天數</div>
-								<div class="field_value">$construction_days_per_floor</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">標準層範圍</div>
-								<div class="field_value">$std_layer_floor</div>
-							</div>
-							<div class="readonly_item">
-								<div class="field_label">屋突層範圍</div>
-								<div class="field_value">$roof_protrusion_floor</div>
+						</div>
+						<div class="basic_category">
+							<div class="basic_category_title">計價設定</div>
+							<div class="readonly_grid">
+								<div class="readonly_item">
+									<div class="field_label">標準層單價(元)</div>
+									<div class="field_value">$std_floor_u_price</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">屋突層單價(元)</div>
+									<div class="field_value">$roof_protrusion_u_price</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">放樣標準層單價(元)</div>
+									<div class="field_value">$layout_std_floor_u_price</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">放樣屋突層單價(元)</div>
+									<div class="field_value">$square_roof_protrusion_u_price</div>
+								</div>
 							</div>
 						</div>
 					</div>
