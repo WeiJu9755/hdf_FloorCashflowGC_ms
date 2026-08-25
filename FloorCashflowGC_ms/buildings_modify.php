@@ -455,11 +455,32 @@ function is_month_end_day($dayText) {
 }
 
 /**
- * 依基準日期、截止月份與截止日計算該月的截止日期。
+ * 依基準日期、截止月份與截止日計算截止日期；自動抓取交版日／灌漿日時，再加計計價截止天數。
  */
-function get_cutoff_date($baseDate, $cutoffMonth, $deadline) {
+function get_cutoff_date($baseDate, $cutoffMonth, $deadline, $pricingDays = 0, $autoDeliveryDate = "", $autoGroutingDate = "") {
 	if (!is_valid_floorcashflow_date($baseDate)) {
 		return null;
+	}
+
+	// 截止日選擇「交版日(自動抓取)」或「灌漿日(自動抓取)」時，
+	// 以對應樓層日期為截止基準，並加上設定的計價截止天數。
+	$auto_day_text_type = get_auto_floor_date_day_text_type($deadline);
+	if ($auto_day_text_type != "") {
+		$autoCutoffDate = "";
+		if ($auto_day_text_type == "grouting" && is_valid_floorcashflow_date($autoGroutingDate)) {
+			$autoCutoffDate = $autoGroutingDate;
+		} else if ($auto_day_text_type == "delivery" && is_valid_floorcashflow_date($autoDeliveryDate)) {
+			$autoCutoffDate = $autoDeliveryDate;
+		} else {
+			// 延續既有自動抓取日期的容錯方式：對應日期尚未填寫時，改以目前計價基準日計算。
+			$autoCutoffDate = $baseDate;
+		}
+
+		$result = new DateTime(substr($autoCutoffDate, 0, 10));
+		if (intval($pricingDays) != 0) {
+			$result->modify("+" . intval($pricingDays) . " day");
+		}
+		return $result;
 	}
 
 	$monthOffset = get_month_offset($cutoffMonth);
@@ -492,16 +513,23 @@ function get_payment_date($baseDate, $paymentMonths, $paymentDate, $paymentDays 
 
 	$auto_day_text_type = get_auto_floor_date_day_text_type($paymentDate);
 	if ($auto_day_text_type != "") {
+		$autoPaymentDate = "";
 		if ($auto_day_text_type == "grouting" && is_valid_floorcashflow_date($autoGroutingDate)) {
-			return substr($autoGroutingDate, 0, 10);
+			$autoPaymentDate = $autoGroutingDate;
+		} else if ($auto_day_text_type == "delivery" && is_valid_floorcashflow_date($autoDeliveryDate)) {
+			$autoPaymentDate = $autoDeliveryDate;
+		} else if (is_valid_floorcashflow_date($autoBaseDate)) {
+			$autoPaymentDate = $autoBaseDate;
 		}
-		if ($auto_day_text_type == "delivery" && is_valid_floorcashflow_date($autoDeliveryDate)) {
-			return substr($autoDeliveryDate, 0, 10);
+		if ($autoPaymentDate == "") {
+			return "";
 		}
-		if (is_valid_floorcashflow_date($autoBaseDate)) {
-			return substr($autoBaseDate, 0, 10);
+
+		$result = new DateTime(substr($autoPaymentDate, 0, 10));
+		if (intval($paymentDays) != 0) {
+			$result->modify("+" . intval($paymentDays) . " day");
 		}
-		return "";
+		return move_weekend_to_next_monday($result->format("Y-m-d"));
 	}
 
 	$monthOffset = get_month_offset($paymentMonths);
@@ -545,14 +573,16 @@ function calculate_expected_receiving_payment_date(
 	$payment_date_b = "",
 	$payment_days_b = 0,
 	$auto_delivery_date = "",
-	$auto_grouting_date = ""
+	$auto_grouting_date = "",
+	$pricing_days_a = 0,
+	$pricing_days_b = 0
 ) {
 	if (!is_valid_floorcashflow_date($completion_date)) {
 		return "";
 	}
 
 	$baseDate = new DateTime(substr($completion_date, 0, 10));
-	$cutoffDateA = get_cutoff_date($completion_date, $cutoff_month_a, $deadline_a);
+	$cutoffDateA = get_cutoff_date($completion_date, $cutoff_month_a, $deadline_a, $pricing_days_a, $auto_delivery_date, $auto_grouting_date);
 	if (!$cutoffDateA) {
 		return "";
 	}
@@ -567,7 +597,7 @@ function calculate_expected_receiving_payment_date(
 		return get_payment_date($nextBaseDate->format("Y-m-d"), $payment_months_a, $payment_date_a, $payment_days_a, $completion_date, $auto_delivery_date, $auto_grouting_date);
 	}
 
-	$cutoffDateB = get_cutoff_date($completion_date, $cutoff_month_b, $deadline_b);
+	$cutoffDateB = get_cutoff_date($completion_date, $cutoff_month_b, $deadline_b, $pricing_days_b, $auto_delivery_date, $auto_grouting_date);
 	if (!$cutoffDateB) {
 		return "";
 	}
@@ -635,7 +665,9 @@ function calculate_expected_receiving_payment_date_by_prefix($completion_date, $
 		isset($row[$prefix . "_payment_date_" . $seq . "b"]) ? $row[$prefix . "_payment_date_" . $seq . "b"] : "",
 		isset($row[$prefix . "_payment_days_" . $seq . "b"]) ? $row[$prefix . "_payment_days_" . $seq . "b"] : 0,
 		$auto_delivery_date,
-		$auto_grouting_date
+		$auto_grouting_date,
+		isset($row[$prefix . "_pricing_days_" . $seq . "a"]) ? $row[$prefix . "_pricing_days_" . $seq . "a"] : 0,
+		isset($row[$prefix . "_pricing_days_" . $seq . "b"]) ? $row[$prefix . "_pricing_days_" . $seq . "b"] : 0
 	);
 
 	return $date;

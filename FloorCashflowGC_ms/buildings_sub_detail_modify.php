@@ -1102,6 +1102,10 @@ $style_css=<<<EOT
 	color: #0d6efd;
 }
 
+.cashflow_panel_title_collection_date {
+	margin-top: 22px;
+}
+
 .stage_grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -1722,14 +1726,12 @@ $style_css
 							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-calendar-check"></i><span>實際計價日</span></div>
 								$show_actual_billing_date_inputs
+								<div class="cashflow_panel_title cashflow_panel_title_collection_date"><i class="bi bi-calendar-event"></i><span>實際收款日</span></div>
+								$show_actual_collection_date_inputs
 							</div>
 							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>實際扣抵金額</span></div>
 								$show_deduction_amount_inputs
-							</div>
-							<div class="cashflow_edit_panel">
-								<div class="cashflow_panel_title"><i class="bi bi-calendar-event"></i><span>實際收款日</span></div>
-								$show_actual_collection_date_inputs
 							</div>
 							<div class="cashflow_edit_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-receipt"></i><span>實開發票金額(含稅)</span></div>
