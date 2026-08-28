@@ -209,7 +209,7 @@ function deduction_source_from_checkbox($form_values, $field_name) {
 }
 
 /**
- * 依樓層類型取得標準/屋突與放樣單價，計價與放樣合併後再扣除該次扣抵款。
+ * 實際計價與扣抵款均依案件原稅別保存；開票與收款時計為含稅金額後再扣抵，避免含稅減未稅。
  */
 function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_retention_amount, $first_advance_payment_amount, $first_other_deduction_amount, $second_retention_amount, $second_advance_payment_amount, $second_other_deduction_amount) {
 	$auto_seq_sql = addslashes($auto_seq);
@@ -257,14 +257,27 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 	$second_advance_payment_amount = floatval($second_advance_payment_amount);
 	$second_other_deduction_amount = floatval($second_other_deduction_amount);
 	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
-	$first_actual_billing_amount = round((($unit_price * $first_qty) + ($layout_unit_price * $first_layout_qty)) * $tax_multiplier, 2);
-	$second_actual_billing_amount = round((($unit_price * $second_qty) + ($layout_unit_price * $second_layout_qty)) * $tax_multiplier, 2);
-	$first_actual_invoice_amount = round($first_actual_billing_amount - $first_advance_payment_amount - $first_other_deduction_amount, 2);
-	$second_actual_invoice_amount = round($second_actual_billing_amount - $second_advance_payment_amount - $second_other_deduction_amount, 2);
+	// 實際金額與所有扣抵款維持案件原稅別：未稅案件即為未稅，含稅案件即為含稅。
+	$first_actual_billing_amount = round(($unit_price * $first_qty) + ($layout_unit_price * $first_layout_qty), 2);
+	$second_actual_billing_amount = round(($unit_price * $second_qty) + ($layout_unit_price * $second_layout_qty), 2);
+
+	// 實開發票與實際收款一律以含稅金額計算，未稅案件在此才加計營業稅。
+	$first_actual_invoice_amount = round(
+		actual_collection_tax_included_amount($first_actual_billing_amount, $tax_multiplier)
+		- actual_collection_tax_included_amount($first_advance_payment_amount, $tax_multiplier)
+		- actual_collection_tax_included_amount($first_other_deduction_amount, $tax_multiplier),
+		2
+	);
+	$second_actual_invoice_amount = round(
+		actual_collection_tax_included_amount($second_actual_billing_amount, $tax_multiplier)
+		- actual_collection_tax_included_amount($second_advance_payment_amount, $tax_multiplier)
+		- actual_collection_tax_included_amount($second_other_deduction_amount, $tax_multiplier),
+		2
+	);
 	$parts = array(
-		round($first_actual_invoice_amount - $first_retention_amount, 2),
+		round($first_actual_invoice_amount - actual_collection_tax_included_amount($first_retention_amount, $tax_multiplier), 2),
 		0,
-		round($second_actual_invoice_amount - $second_retention_amount, 2),
+		round($second_actual_invoice_amount - actual_collection_tax_included_amount($second_retention_amount, $tax_multiplier), 2),
 		0
 	);
 	$total_amount = round(array_sum($parts), 2);
@@ -285,8 +298,12 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 	);
 }
 
+function actual_collection_tax_included_amount($amount, $tax_multiplier) {
+	return round(floatval($amount) * floatval($tax_multiplier), 2);
+}
+
 /**
- * 未稅計價時，實際計價金額需加計 5% 營業稅；扣抵款本身已依各自稅別計算，不在此重複加稅。
+ * 判斷案件原始計價金額是否為未稅；未稅案件僅在開票、收款時計入 5% 營業稅。
  */
 function actual_collection_is_tax_excluded($value) {
 	$value = strtoupper(trim((string)$value));
@@ -488,9 +505,11 @@ $second_actual_collection_date = "";
 $second_layout_actual_collection_date = "";
 $payment_request_stage = "";
 $remark = "";
+$tax_excluded = "";
 
-$Qry="SELECT a.*
+$Qry="SELECT a.*, c.tax_excluded
 FROM buildings_sub_detail a
+LEFT JOIN CaseManagement c ON c.case_id = a.case_id
 WHERE a.auto_seq = '$auto_seq'";
 $mDB->query($Qry);
 
@@ -557,6 +576,7 @@ if ($total > 0) {
 	$second_layout_actual_collection_date = $row['second_layout_actual_collection_date'];
 	$payment_request_stage = $row['payment_request_stage'];
 	$remark = $row['remark'];
+	$tax_excluded = $row['tax_excluded'];
 
 }
 
@@ -577,7 +597,7 @@ if ($first_layout_actual_completed_qty == "" && $second_layout_actual_completed_
 	$second_layout_actual_completed_qty = $second_actual_completed_qty;
 }
 
-if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "" || $first_actual_invoice_amount == "" || $second_actual_invoice_amount == "") && ($first_actual_completed_qty != "" || $second_actual_completed_qty != "")) {
+if ($first_actual_completed_qty != "" || $second_actual_completed_qty != "") {
 	$preview_collection_result = calculate_actual_collection_amounts(
 		$mDB,
 		$auto_seq,
@@ -593,17 +613,18 @@ if (($first_actual_billing_amount == "" || $second_actual_billing_amount == "" |
 		floatval($second_other_deduction_amount)
 	);
 	if ($preview_collection_result['ok']) {
-		if ($first_actual_billing_amount == "") {
-			$first_actual_billing_amount = $preview_collection_result['first_actual_billing_amount'];
+		// 顯示值一律依目前案件稅別重算，避免案件稅別異動後仍顯示舊的含／未稅結果。
+		$first_actual_billing_amount = $preview_collection_result['first_actual_billing_amount'];
+		$second_actual_billing_amount = $preview_collection_result['second_actual_billing_amount'];
+		$first_actual_invoice_amount = $preview_collection_result['first_actual_invoice_amount'];
+		$second_actual_invoice_amount = $preview_collection_result['second_actual_invoice_amount'];
+		if ($first_actual_collection_amount_source == 'auto') {
+			$first_actual_collection_amount = $preview_collection_result['parts'][0];
+			$first_layout_actual_collection_amount = 0;
 		}
-		if ($second_actual_billing_amount == "") {
-			$second_actual_billing_amount = $preview_collection_result['second_actual_billing_amount'];
-		}
-		if ($first_actual_invoice_amount == "") {
-			$first_actual_invoice_amount = $preview_collection_result['first_actual_invoice_amount'];
-		}
-		if ($second_actual_invoice_amount == "") {
-			$second_actual_invoice_amount = $preview_collection_result['second_actual_invoice_amount'];
+		if ($second_actual_collection_amount_source == 'auto') {
+			$second_actual_collection_amount = $preview_collection_result['parts'][2];
+			$second_layout_actual_collection_amount = 0;
 		}
 	}
 }
@@ -628,6 +649,7 @@ $show_first_actual_billing_amount = ($first_actual_billing_amount != "" && $firs
 $show_second_actual_billing_amount = ($second_actual_billing_amount != "" && $second_actual_billing_amount != 0) ? number_format($second_actual_billing_amount, 2) : "";
 $show_first_actual_invoice_amount = number_format(floatval($first_actual_invoice_amount), 2);
 $show_second_actual_invoice_amount = number_format(floatval($second_actual_invoice_amount), 2);
+$actual_amount_tax_label = actual_collection_is_tax_excluded($tax_excluded) ? "未稅" : "含稅";
 $show_expected_collection_amount = "
 	<div class=\"summary_line\"><span>第一次金額：</span><b>$show_first_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第一次放樣：</span><b>$show_first_layout_expected_collection_amount</b></div>
 	<div class=\"summary_line\"><span>第二次金額：</span><b>$show_second_expected_collection_amount</b><span class=\"summary_gap\"></span><span>第二次放樣：</span><b>$show_second_layout_expected_collection_amount</b></div>
@@ -700,7 +722,7 @@ $show_actual_invoice_amount_inputs = "
 			<input type=\"text\" class=\"form-control actual_field\" id=\"second_actual_invoice_amount_preview\" value=\"$show_second_actual_invoice_amount\" readonly>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 實開發票金額 = 實際金額 − 扣抵預收款 − 其他扣抵款。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 實開發票金額以含稅金額計算：實際金額(含稅) − 扣抵預收款(含稅) − 其他扣抵款(含稅)。</div>
 ";
 
 $show_actual_collection_amount_inputs = "
@@ -722,7 +744,7 @@ $show_actual_collection_amount_inputs = "
 			<input type=\"hidden\" id=\"second_actual_collection_amount_source\" name=\"second_actual_collection_amount_source\" value=\"$second_actual_collection_amount_source\">
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 預設依公式自動計算；手動修改後會保留輸入值，不再受自動公式影響。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 預設以含稅金額依公式自動計算；手動修改後會保留輸入值，不再受自動公式影響。</div>
 ";
 
 $show_deduction_amount_inputs = "
@@ -740,7 +762,7 @@ $show_deduction_amount_inputs = "
 			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_other_deduction_amount\" value=\"$second_other_deduction_amount\" onchange=\"setEdit();\"></div>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 未勾選「手動」會在存檔時自動重算；勾選後保留輸入金額，不會被自動覆蓋。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 所有扣抵款均以案件原稅別輸入及保存；未勾選「手動」會在存檔時自動重算。</div>
 ";
 
 $show_actual_collection_date_inputs = "
@@ -1616,14 +1638,136 @@ EOT;
 
 }
 
+$actual_tax_theme_class = actual_collection_is_tax_excluded($tax_excluded) ? "tax_theme_untaxed" : "tax_theme_taxed";
+$tax_theme_css=<<<EOT
+<style>
+.tax_theme_scope.tax_theme_taxed {
+	--tax-theme-primary: #0b5f75;
+	--tax-theme-accent: #0d6efd;
+	--tax-theme-header: #0e7490;
+	--tax-theme-surface: #f0f9ff;
+	--tax-theme-border: #bae6fd;
+	--tax-theme-muted: #e0f2fe;
+	--tax-theme-soft-text: #0369a1;
+	--tax-theme-action: #0d6efd;
+	--tax-theme-action-hover: #0b5ed7;
+}
+
+.tax_theme_scope.tax_theme_untaxed {
+	--tax-theme-primary: #9a3412;
+	--tax-theme-accent: #ea580c;
+	--tax-theme-header: #b45309;
+	--tax-theme-surface: #fff7ed;
+	--tax-theme-border: #fed7aa;
+	--tax-theme-muted: #ffedd5;
+	--tax-theme-soft-text: #9a3412;
+	--tax-theme-action: #15803d;
+	--tax-theme-action-hover: #166534;
+}
+
+/* 未稅案件中，含稅結果區塊仍沿用含稅介面的藍色系。 */
+.tax_theme_scope.tax_theme_untaxed .tax_included_amount_panel {
+	--tax-theme-primary: #0b5f75;
+	--tax-theme-accent: #0d6efd;
+	--tax-theme-surface: #f0f9ff;
+	--tax-theme-border: #bae6fd;
+	--tax-theme-muted: #e0f2fe;
+	--tax-theme-soft-text: #0369a1;
+}
+
+.tax_theme_scope > .card-header {
+	background-color: var(--tax-theme-header) !important;
+	border-color: var(--tax-theme-header) !important;
+	color: #fff !important;
+}
+
+.tax_theme_scope .tax_theme_badge {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 8px;
+	padding: 2px 8px;
+	border: 1px solid rgba(255, 255, 255, .55);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, .18);
+	color: #fff;
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.tax_theme_scope .modify_section {
+	border-color: var(--tax-theme-border);
+}
+
+.tax_theme_scope .section_title,
+.tax_theme_scope .basic_overview_heading,
+.tax_theme_scope .deduction_stage_title,
+.tax_theme_scope .cashflow_panel_title,
+.tax_theme_scope .actual_amount_value {
+	color: var(--tax-theme-primary);
+}
+
+.tax_theme_scope .field_value_main,
+.tax_theme_scope .summary_line b,
+.tax_theme_scope .cashflow_panel_title i {
+	color: var(--tax-theme-accent);
+}
+
+.tax_theme_scope .basic_actual_qty,
+.tax_theme_scope .cashflow_edit_panel {
+	border-color: var(--tax-theme-border);
+	background: var(--tax-theme-surface);
+}
+
+.tax_theme_scope .basic_overview_section,
+.tax_theme_scope .deduction_stage_title,
+.tax_theme_scope .actual_amount_card {
+	border-color: var(--tax-theme-border);
+}
+
+.tax_theme_scope .deduction_amount_input[readonly] {
+	background-color: var(--tax-theme-muted);
+}
+
+.tax_theme_scope .collection_source_badge {
+	background: var(--tax-theme-muted);
+	color: var(--tax-theme-soft-text);
+}
+
+.tax_theme_scope .collection_source_badge.is_manual {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+.tax_theme_scope #save {
+	background-color: var(--tax-theme-action);
+	border-color: var(--tax-theme-action);
+	color: #fff;
+}
+
+.tax_theme_scope #save:hover,
+.tax_theme_scope #save:focus,
+.tax_theme_scope #save:active {
+	background-color: var(--tax-theme-action-hover);
+	border-color: var(--tax-theme-action-hover);
+	color: #fff;
+}
+
+.tax_theme_scope .form-control:focus,
+.tax_theme_scope .form-select:focus {
+	border-color: var(--tax-theme-accent);
+}
+</style>
+EOT;
+
 
 
 $show_center=<<<EOT
 $style_css
-<div class="card card_full">
+$tax_theme_css
+<div class="card card_full tax_theme_scope $actual_tax_theme_class">
 	<div class="card-header text-bg-info">
 		<div class="size14 weight float-start" style="margin-top: 5px;">
-			$mess_title
+			$mess_title<span class="tax_theme_badge">$actual_amount_tax_label</span>
 		</div>
 		<div class="float-end" style="margin-top: -5px;">
 			$show_savebtn
@@ -1702,7 +1846,7 @@ $style_css
 										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
 									</div>
 									<div>
-										<div class="actual_label">第一次實際金額</div>
+										<div class="actual_label">第一次實際金額($actual_amount_tax_label)</div>
 										<input type="text" class="form-control actual_field" id="first_actual_billing_amount_preview" value="$show_first_actual_billing_amount" readonly />
 									</div>
 									<div>
@@ -1714,7 +1858,7 @@ $style_css
 										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
 									</div>
 									<div>
-										<div class="actual_label">第二次實際金額</div>
+										<div class="actual_label">第二次實際金額($actual_amount_tax_label)</div>
 										<input type="text" class="form-control actual_field" id="second_actual_billing_amount_preview" value="$show_second_actual_billing_amount" readonly />
 									</div>
 							</div>
@@ -1730,14 +1874,14 @@ $style_css
 								$show_actual_collection_date_inputs
 							</div>
 							<div class="cashflow_edit_panel">
-								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>實際扣抵金額</span></div>
+								<div class="cashflow_panel_title"><i class="bi bi-dash-circle"></i><span>實際扣抵金額($actual_amount_tax_label)</span></div>
 								$show_deduction_amount_inputs
 							</div>
-							<div class="cashflow_edit_panel">
+							<div class="cashflow_edit_panel tax_included_amount_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-receipt"></i><span>實開發票金額(含稅)</span></div>
 								$show_actual_invoice_amount_inputs
 							</div>
-							<div class="cashflow_edit_panel">
+							<div class="cashflow_edit_panel tax_included_amount_panel">
 								<div class="cashflow_panel_title"><i class="bi bi-cash-coin"></i><span>實際收款金額(含稅)</span></div>
 								$show_actual_collection_amount_inputs
 							</div>

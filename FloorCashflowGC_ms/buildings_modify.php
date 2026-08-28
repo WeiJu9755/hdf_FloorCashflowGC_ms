@@ -144,7 +144,7 @@ function apply_expected_work_qty($case_id,$memberID){
 	$retention_rate = get_case_retention_percentage_sum($mDB, $case_id_sql) / 100;
 	$advance_payment_rate = get_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
 
-	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,tax_excluded FROM CaseManagement WHERE case_id = '$case_id_sql'";
+	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,gc_price_base_day1,gc_price_base_day2,tax_excluded FROM CaseManagement WHERE case_id = '$case_id_sql'";
 	$mDB->query($Qry);
 	if ($mDB->rowCount() == 0) {
 		$mDB->remove();
@@ -157,6 +157,8 @@ function apply_expected_work_qty($case_id,$memberID){
 	$layout_std_floor_u_price = floatval($case_row['layout_std_floor_u_price']);
 	$square_roof_protrusion_u_price = floatval($case_row['square_roof_protrusion_u_price']);
 	$gc_price_base_date = $case_row['gc_price_base_date'];
+	$gc_price_base_day1 = intval($case_row['gc_price_base_day1']);
+	$gc_price_base_day2 = intval($case_row['gc_price_base_day2']);
 	$tax_multiplier = is_tax_excluded_checked($case_row['tax_excluded']) ? 1.05 : 1;
 
 	$Qry="SELECT * FROM buildings_sub WHERE case_id = '$case_id_sql' ORDER BY auto_seq";
@@ -268,7 +270,9 @@ function apply_expected_work_qty($case_id,$memberID){
 				$next_expected_actual_grouting_date,
 				$building,
 				$detail_row['floor'],
-				$warning_list
+				$warning_list,
+				$gc_price_base_day1,
+				$gc_price_base_day2
 			);
 			$first_expected_collection_date_1 = sql_date_value($expected_collection_dates[0]);
 			$first_expected_collection_date_2 = sql_date_value($expected_collection_dates[1]);
@@ -380,6 +384,22 @@ function is_valid_floorcashflow_date($date) {
 	$date = substr($date, 0, 10);
 	$d = DateTime::createFromFormat("Y-m-d", $date);
 	return $d && $d->format("Y-m-d") === $date;
+}
+
+/**
+ * 將有效基準日加上案件設定的天數；未提供日期時維持空值。
+ */
+function add_floorcashflow_base_days($date, $days) {
+	if (!is_valid_floorcashflow_date($date)) {
+		return "";
+	}
+
+	$result = new DateTime(substr($date, 0, 10));
+	$days = intval($days);
+	if ($days != 0) {
+		$result->modify(($days > 0 ? "+" : "") . $days . " day");
+	}
+	return $result->format("Y-m-d");
 }
 
 /**
@@ -676,7 +696,7 @@ function calculate_expected_receiving_payment_date_by_prefix($completion_date, $
 /**
  * 依樓層的交版日、灌漿日與案件計價日基準，計算四個預計收款日。
  */
-function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_date, $delivery_date, $grouting_date, $next_grouting_date, $building, $floor, &$warning_list) {
+function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_date, $delivery_date, $grouting_date, $next_grouting_date, $building, $floor, &$warning_list, $gc_price_base_day1 = 0, $gc_price_base_day2 = 0) {
 	$normalized_base_date = normalize_gc_price_base_date($gc_price_base_date);
 	$has_delivery_date = strpos($normalized_base_date, "交版日") !== false;
 	$has_grouting_date = strpos($normalized_base_date, "灌漿日") !== false;
@@ -692,47 +712,53 @@ function calculate_floor_expected_collection_dates($pricing_row, $gc_price_base_
 	$delivery_base = is_valid_floorcashflow_date($delivery_date) ? substr($delivery_date, 0, 10) : "";
 	$grouting_base = is_valid_floorcashflow_date($grouting_date) ? substr($grouting_date, 0, 10) : "";
 	$next_grouting_base = is_valid_floorcashflow_date($next_grouting_date) ? substr($next_grouting_date, 0, 10) : "";
+	$first_delivery_base = add_floorcashflow_base_days($delivery_base, $gc_price_base_day1);
+	$first_grouting_base = add_floorcashflow_base_days($grouting_base, $gc_price_base_day1);
+	$first_next_grouting_base = add_floorcashflow_base_days($next_grouting_base, $gc_price_base_day1);
+	$second_delivery_base = add_floorcashflow_base_days($delivery_base, $gc_price_base_day2);
+	$second_grouting_base = add_floorcashflow_base_days($grouting_base, $gc_price_base_day2);
+	$second_next_grouting_base = add_floorcashflow_base_days($next_grouting_base, $gc_price_base_day2);
 	$use_next_base = ($has_cleaning_date || $has_next_floor_grouting);
 
 	if ($use_next_base && $next_grouting_base == "") {
 		$warning_list[] = $building." ".$floor." 缺少下一層灌漿日";
 	}
 
-	if ($is_cleaning_first_only && $next_grouting_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+	if ($is_cleaning_first_only && $first_next_grouting_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($first_next_grouting_base, $pricing_row, "fp", 1, $first_delivery_base, $first_grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($first_next_grouting_base, $pricing_row, "fp", 2, $first_delivery_base, $first_grouting_base);
 		return $dates;
 	} else if ($is_cleaning_first_only) {
 		return $dates;
 	}
 
 	if ($use_next_base && $next_grouting_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
-		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 1, $delivery_base, $grouting_base);
-		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($next_grouting_base, $pricing_row, "sp", 2, $delivery_base, $grouting_base);
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($first_next_grouting_base, $pricing_row, "fp", 1, $first_delivery_base, $first_grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($first_next_grouting_base, $pricing_row, "fp", 2, $first_delivery_base, $first_grouting_base);
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($second_next_grouting_base, $pricing_row, "sp", 1, $second_delivery_base, $second_grouting_base);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($second_next_grouting_base, $pricing_row, "sp", 2, $second_delivery_base, $second_grouting_base);
 		return $dates;
 	}
 
-	if ($is_grouting_only && $grouting_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+	if ($is_grouting_only && $first_grouting_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($first_grouting_base, $pricing_row, "fp", 1, $first_delivery_base, $first_grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($first_grouting_base, $pricing_row, "fp", 2, $first_delivery_base, $first_grouting_base);
 		return $dates;
 	} else if ($is_grouting_only) {
 		$warning_list[] = $building." ".$floor." 缺少灌漿日";
 		return $dates;
 	}
 
-	if (($use_two_ratio || $has_delivery_date) && $delivery_base != "") {
-		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 1, $delivery_base, $grouting_base);
-		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($delivery_base, $pricing_row, "fp", 2, $delivery_base, $grouting_base);
+	if (($use_two_ratio || $has_delivery_date) && $first_delivery_base != "") {
+		$dates[0] = calculate_expected_receiving_payment_date_by_prefix($first_delivery_base, $pricing_row, "fp", 1, $first_delivery_base, $first_grouting_base);
+		$dates[1] = calculate_expected_receiving_payment_date_by_prefix($first_delivery_base, $pricing_row, "fp", 2, $first_delivery_base, $first_grouting_base);
 	} else if ($has_delivery_date) {
 		$warning_list[] = $building." ".$floor." 缺少交版日";
 	}
 
-	if (($use_two_ratio || $has_grouting_date) && $grouting_base != "") {
-		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 1, $delivery_base, $grouting_base);
-		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($grouting_base, $pricing_row, "sp", 2, $delivery_base, $grouting_base);
+	if (($use_two_ratio || $has_grouting_date) && $second_grouting_base != "") {
+		$dates[2] = calculate_expected_receiving_payment_date_by_prefix($second_grouting_base, $pricing_row, "sp", 1, $second_delivery_base, $second_grouting_base);
+		$dates[3] = calculate_expected_receiving_payment_date_by_prefix($second_grouting_base, $pricing_row, "sp", 2, $second_delivery_base, $second_grouting_base);
 	} else if ($has_grouting_date) {
 		$warning_list[] = $building." ".$floor." 缺少灌漿日";
 	}
