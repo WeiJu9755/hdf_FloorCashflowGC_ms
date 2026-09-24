@@ -290,8 +290,8 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
 					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次金額：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次金額：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次之一：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次之二：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -314,13 +314,12 @@ $list_view
 					while (values.length < 4) {
 						values.push('');
 					}
-					var firstAmount = amountToNumber(values[0]) + amountToNumber(values[1]);
-					var secondAmount = amountToNumber(values[2]) + amountToNumber(values[3]);
-					values[0] = (firstAmount != 0) ? number_format(firstAmount, 2) : '';
-					values[1] = (secondAmount != 0) ? number_format(secondAmount, 2) : '';
+					for (var i = 0; i < values.length; i++) {
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
+					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次金額：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次金額：</span><span class="collection-amount-value second-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次之一：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次之二：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 
@@ -361,8 +360,8 @@ $list_view
 						values[i] = (values[i] != null && values[i] != '' && values[i] != '0000-00-00') ? values[i] : '';
 					}
 					return '<div class="collection-amount-box">'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次日期：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次放樣：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
-						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次日期：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次放樣：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
+						+'<div class="collection-amount-line"><span class="collection-amount-label">第二次之一：</span><span class="collection-amount-value second-stage-value">'+values[2]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第二次之二：</span><span class="collection-amount-value second-stage-value">'+values[3]+'</span></div>'
 						+'</div>';
 				}
 

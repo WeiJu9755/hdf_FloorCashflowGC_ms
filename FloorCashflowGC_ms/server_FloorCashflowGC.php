@@ -175,22 +175,22 @@
 				case_id,
 				COUNT(*) AS floor_count,
 				SUM(
-					COALESCE(first_expected_collection_amount, 0) +
-					COALESCE(first_layout_expected_collection_amount, 0) +
-					COALESCE(second_expected_collection_amount, 0) +
-					COALESCE(second_layout_expected_collection_amount, 0)
+					COALESCE(first_expected_collection_amount_1, 0) +
+					COALESCE(first_expected_collection_amount_2, 0) +
+					COALESCE(second_expected_collection_amount_1, 0) +
+					COALESCE(second_expected_collection_amount_2, 0)
 				) AS expected_collection_amount,
 				SUM(
 					CASE
-						WHEN first_actual_collection_amount IS NULL
-						 AND first_layout_actual_collection_amount IS NULL
-						 AND second_actual_collection_amount IS NULL
-						 AND second_layout_actual_collection_amount IS NULL
+						WHEN first_actual_collection_amount_1 IS NULL
+						 AND first_actual_collection_amount_2 IS NULL
+						 AND second_actual_collection_amount_1 IS NULL
+						 AND second_actual_collection_amount_2 IS NULL
 						THEN COALESCE(actual_collection_amount, 0)
-						ELSE COALESCE(first_actual_collection_amount, 0) +
-							 COALESCE(first_layout_actual_collection_amount, 0) +
-							 COALESCE(second_actual_collection_amount, 0) +
-							 COALESCE(second_layout_actual_collection_amount, 0)
+						ELSE COALESCE(first_actual_collection_amount_1, 0) +
+							 COALESCE(first_actual_collection_amount_2, 0) +
+							 COALESCE(second_actual_collection_amount_1, 0) +
+							 COALESCE(second_actual_collection_amount_2, 0)
 					END
 				) AS actual_collection_amount
 			FROM buildings_sub_detail

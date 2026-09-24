@@ -145,10 +145,11 @@ if ($mDB->rowCount() > 0) {
 	$outsourcing = $row['outsourcing'];
 }
 
-// 開啟編輯頁時，自動以 CaseManagement 的合約／放樣總數量同步本棟資料。
+// 顯示 CaseManagement 的合約／放樣總數量與單價。
 if (!empty($case_id)) {
 	$case_id_sql = addslashes($case_id);
 	$Qry="SELECT tot_std_contract_layers,
+				construction_id,
 				tot_houses_multi_floors,
 				layout_std_floor_total_qty,
 				layout_roof_protrusion_total_qty,
@@ -162,6 +163,7 @@ if (!empty($case_id)) {
 	$mDB->query($Qry);
 	if ($mDB->rowCount() > 0) {
 		$case_qty_row = $mDB->fetchRow(2);
+		$construction_id = $case_qty_row['construction_id'];
 		$std_layer_qty = $case_qty_row['tot_std_contract_layers'];
 		$roof_protrusion_qty = $case_qty_row['tot_houses_multi_floors'];
 		$layout_std_layer_qty = $case_qty_row['layout_std_floor_total_qty'];
@@ -171,18 +173,6 @@ if (!empty($case_id)) {
 		$layout_std_floor_u_price = $case_qty_row['layout_std_floor_u_price'];
 		$square_roof_protrusion_u_price = $case_qty_row['square_roof_protrusion_u_price'];
 
-		$std_layer_qty_sql = addslashes($std_layer_qty);
-		$roof_protrusion_qty_sql = addslashes($roof_protrusion_qty);
-		$layout_std_layer_qty_sql = addslashes($layout_std_layer_qty);
-		$layout_roof_protrusion_qty_sql = addslashes($layout_roof_protrusion_qty);
-		$auto_seq_sql = addslashes($auto_seq);
-		$Qry="UPDATE buildings_sub SET
-				 std_layer_qty = '$std_layer_qty_sql'
-				,roof_protrusion_qty = '$roof_protrusion_qty_sql'
-				,layout_std_layer_qty = '$layout_std_layer_qty_sql'
-				,layout_roof_protrusion_qty = '$layout_roof_protrusion_qty_sql'
-			  WHERE auto_seq = '$auto_seq_sql'";
-		$mDB->query($Qry);
 	}
 }
 
@@ -420,6 +410,19 @@ $style_css
 				<div class="field_container3">
 					<div class="modify_section">
 						<div class="section_title">基本資料</div>
+						<div class="basic_category">
+							<div class="basic_category_title">案件資訊</div>
+							<div class="readonly_grid">
+								<div class="readonly_item">
+									<div class="field_label">案件編號</div>
+									<div class="field_value field_value_main">$case_id</div>
+								</div>
+								<div class="readonly_item">
+									<div class="field_label">工程名稱</div>
+									<div class="field_value field_value_main">$construction_id</div>
+								</div>
+							</div>
+						</div>
 						<div class="basic_category">
 							<div class="basic_category_title">棟別概況</div>
 							<div class="readonly_grid">

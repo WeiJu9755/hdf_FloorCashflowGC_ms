@@ -3,7 +3,10 @@
 //error_reporting(E_ALL); 
 //ini_set('display_errors', '1');
 
-session_start();
+if (!(defined('HDF_AUTOMATION_LIBRARY_MODE') && HDF_AUTOMATION_LIBRARY_MODE)
+	&& session_status() !== PHP_SESSION_ACTIVE) {
+	session_start();
+}
 
 $memberID = $_SESSION['memberID'];
 $powerkey = $_SESSION['powerkey'];
@@ -19,10 +22,16 @@ $detect = new Mobile_Detect;
 //連結資料
 @include_once("/website/class/".$site_db."_info_class.php");
 require_once __DIR__."/module_modify_log.php";
+require_once __DIR__."/holiday_calendar_helper.php";
 
 /* 使用xajax */
 @include_once '/website/xajax/xajax_core/xajax.inc.php';
-$xajax = new xajax();
+if (defined('HDF_AUTOMATION_LIBRARY_MODE') && HDF_AUTOMATION_LIBRARY_MODE) {
+	// 明確指定內部 URI，避免 php-cgi 排程環境無法自動判斷 Request URI。
+	$xajax = new xajax('/website/crontab/daily_floor_cashflow_gc.php');
+} else {
+	$xajax = new xajax();
+}
 
 
 $xajax->registerFunction("DeleteRow");
@@ -219,10 +228,10 @@ function apply_expected_work_qty($case_id,$memberID){
 			$first_layout_expected_work_qty = "NULL";
 			$second_expected_work_qty = "NULL";
 			$second_layout_expected_work_qty = "NULL";
-			$first_expected_collection_amount = "NULL";
-			$first_layout_expected_collection_amount = "NULL";
-			$second_expected_collection_amount = "NULL";
-			$second_layout_expected_collection_amount = "NULL";
+			$first_expected_collection_amount_1 = "NULL";
+			$first_expected_collection_amount_2 = "NULL";
+			$second_expected_collection_amount_1 = "NULL";
+			$second_expected_collection_amount_2 = "NULL";
 			$first_expected_collection_date_1 = "NULL";
 			$first_expected_collection_date_2 = "NULL";
 			$second_expected_collection_date_1 = "NULL";
@@ -247,15 +256,33 @@ function apply_expected_work_qty($case_id,$memberID){
 			$second_expected_work_qty = round($work_qty * $second_rate, 2);
 			$second_layout_expected_work_qty = round($layout_work_qty * $second_rate, 2);
 
-			$first_base_collection_amount = $first_expected_work_qty * $unit_price * $tax_multiplier;
-			$first_layout_base_collection_amount = $first_layout_expected_work_qty * $layout_unit_price * $tax_multiplier;
-			$second_base_collection_amount = $second_expected_work_qty * $unit_price * $tax_multiplier;
-			$second_layout_base_collection_amount = $second_layout_expected_work_qty * $layout_unit_price * $tax_multiplier;
+			$first_base_collection_amount = (
+				($first_expected_work_qty * $unit_price) +
+				($first_layout_expected_work_qty * $layout_unit_price)
+			) * $tax_multiplier;
+			$second_base_collection_amount = (
+				($second_expected_work_qty * $unit_price) +
+				($second_layout_expected_work_qty * $layout_unit_price)
+			) * $tax_multiplier;
 
-			$first_expected_collection_amount = calculate_expected_collection_amount($first_base_collection_amount, $retention_rate, $advance_payment_rate);
-			$first_layout_expected_collection_amount = calculate_expected_collection_amount($first_layout_base_collection_amount, $retention_rate, $advance_payment_rate);
-			$second_expected_collection_amount = calculate_expected_collection_amount($second_base_collection_amount, $retention_rate, $advance_payment_rate);
-			$second_layout_expected_collection_amount = calculate_expected_collection_amount($second_layout_base_collection_amount, $retention_rate, $advance_payment_rate);
+			$first_collection_parts = calculate_expected_collection_parts(
+				$first_base_collection_amount,
+				$retention_rate,
+				$advance_payment_rate,
+				isset($pricing_row['fp_receiving_payment_percent_1']) ? $pricing_row['fp_receiving_payment_percent_1'] : 0,
+				isset($pricing_row['fp_receiving_payment_percent_2']) ? $pricing_row['fp_receiving_payment_percent_2'] : 0
+			);
+			$second_collection_parts = calculate_expected_collection_parts(
+				$second_base_collection_amount,
+				$retention_rate,
+				$advance_payment_rate,
+				isset($pricing_row['sp_receiving_payment_percent_1']) ? $pricing_row['sp_receiving_payment_percent_1'] : 0,
+				isset($pricing_row['sp_receiving_payment_percent_2']) ? $pricing_row['sp_receiving_payment_percent_2'] : 0
+			);
+			$first_expected_collection_amount_1 = $first_collection_parts[0];
+			$first_expected_collection_amount_2 = $first_collection_parts[1];
+			$second_expected_collection_amount_1 = $second_collection_parts[0];
+			$second_expected_collection_amount_2 = $second_collection_parts[1];
 
 			$next_expected_actual_grouting_date = "";
 			if (isset($details[$j + 1])) {
@@ -285,10 +312,10 @@ function apply_expected_work_qty($case_id,$memberID){
 				,first_layout_expected_work_qty = $first_layout_expected_work_qty
 				,second_expected_work_qty = $second_expected_work_qty
 				,second_layout_expected_work_qty = $second_layout_expected_work_qty
-				,first_expected_collection_amount = $first_expected_collection_amount
-				,first_layout_expected_collection_amount = $first_layout_expected_collection_amount
-				,second_expected_collection_amount = $second_expected_collection_amount
-				,second_layout_expected_collection_amount = $second_layout_expected_collection_amount
+				,first_expected_collection_amount_1 = $first_expected_collection_amount_1
+				,first_expected_collection_amount_2 = $first_expected_collection_amount_2
+				,second_expected_collection_amount_1 = $second_expected_collection_amount_1
+				,second_expected_collection_amount_2 = $second_expected_collection_amount_2
 				,first_expected_collection_date_1 = $first_expected_collection_date_1
 				,first_expected_collection_date_2 = $first_expected_collection_date_2
 				,second_expected_collection_date_1 = $second_expected_collection_date_1
@@ -372,6 +399,26 @@ function calculate_expected_collection_amount($base_amount, $retention_rate, $ad
 	return round($base_amount - ($base_amount * $retention_rate) - ($base_amount * $advance_payment_rate), 2);
 }
 
+/**
+ * 將樓層與放樣合併後的單一占比收款金額，依上包計價設定拆成之一、之二。
+ */
+function calculate_expected_collection_parts($base_amount, $retention_rate, $advance_payment_rate, $first_percent, $second_percent) {
+	$total_amount = calculate_expected_collection_amount($base_amount, $retention_rate, $advance_payment_rate);
+	if ($total_amount === "NULL") {
+		return array("NULL", "NULL");
+	}
+
+	$first_percent = floatval($first_percent);
+	$second_percent = floatval($second_percent);
+	$first_amount = ($first_percent > 0) ? round(floatval($total_amount) * $first_percent / 100, 2) : "NULL";
+	$second_amount = ($second_percent > 0) ? round(floatval($total_amount) * $second_percent / 100, 2) : "NULL";
+	if ($first_percent > 0 && $second_percent > 0 && abs(($first_percent + $second_percent) - 100) < 0.00001) {
+		$second_amount = round(floatval($total_amount) - floatval($first_amount), 2);
+	}
+
+	return array($first_amount, $second_amount);
+}
+
 
 
 /**
@@ -403,20 +450,10 @@ function add_floorcashflow_base_days($date, $days) {
 }
 
 /**
- * 若日期落在週末，順延到下一個星期一。
+ * 若日期落在國定假日、補假或週末，順延到下一個工作日。
  */
 function move_weekend_to_next_monday($date) {
-	if (!is_valid_floorcashflow_date($date)) {
-		return "";
-	}
-	$d = new DateTime(substr($date, 0, 10));
-	$week = intval($d->format("N"));
-	if ($week == 6) {
-		$d->modify("+2 day");
-	} else if ($week == 7) {
-		$d->modify("+1 day");
-	}
-	return $d->format("Y-m-d");
+	return holiday_calendar_move_to_next_workday($date);
 }
 
 /**
@@ -878,6 +915,11 @@ function parse_floor_code($floor_text) {
 		return array("prefix" => $prefix, "number" => intval($matches[2]));
 	}
 	return false;
+}
+
+// 批次程式只載入上方的預計金流計算函式，不執行 xajax 與編輯畫面。
+if (defined('HDF_AUTOMATION_LIBRARY_MODE') && HDF_AUTOMATION_LIBRARY_MODE) {
+	return;
 }
 
 $xajax->processRequest();
