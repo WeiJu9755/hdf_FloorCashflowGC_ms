@@ -8,6 +8,16 @@ function updateFloorCashflowGCModifyLog($mDB, $case_id, $memberID)
 	if ($case_id === '' || $memberID === '') {
 		return;
 	}
+	if (defined('HDF_AUTOMATION_LIBRARY_MODE') && HDF_AUTOMATION_LIBRARY_MODE) {
+		$Qry = "INSERT INTO case_module_modify_log
+				(case_id, floor_cashflow_gc_auto_last_modify)
+			VALUES
+				('$case_id', NOW())
+			ON DUPLICATE KEY UPDATE
+				floor_cashflow_gc_auto_last_modify = VALUES(floor_cashflow_gc_auto_last_modify)";
+		$mDB->query($Qry);
+		return;
+	}
 
 	$Qry = "INSERT INTO case_module_modify_log
 			(case_id, floor_cashflow_gc_makeby, floor_cashflow_gc_last_modify)

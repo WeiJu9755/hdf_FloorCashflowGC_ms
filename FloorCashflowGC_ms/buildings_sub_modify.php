@@ -40,27 +40,36 @@ function processform($aFormValues){
 		$mDB = "";
 		$mDB = new MywebDB();
 
-		// 數量以 CaseManagement 為唯一來源，避免唯讀欄位遭前端竄改。
+		$quantity_fields = ['std_layer_qty', 'roof_protrusion_qty', 'layout_std_layer_qty', 'layout_roof_protrusion_qty'];
+		$quantities = [];
+		foreach ($quantity_fields as $field) {
+			$value = trim($aFormValues[$field] ?? '');
+			if ($value === '') {
+				$value = '0';
+			}
+			if (!preg_match('/^\d+(?:\.\d+)?$/D', $value)) {
+				$objResponse->script("jAlert('警示', '請輸入有效的非負數量。', 'red', '', 2000);");
+				return $objResponse;
+			}
+			$quantities[$field] = addslashes($value);
+		}
+		$std_layer_qty = $quantities['std_layer_qty'];
+		$roof_protrusion_qty = $quantities['roof_protrusion_qty'];
+		$layout_std_layer_qty = $quantities['layout_std_layer_qty'];
+		$layout_roof_protrusion_qty = $quantities['layout_roof_protrusion_qty'];
+
 		$auto_seq_sql = addslashes($auto_seq);
-		$Qry="SELECT cm.tot_std_contract_layers,
-					cm.tot_houses_multi_floors,
-					cm.layout_std_floor_total_qty,
-					cm.layout_roof_protrusion_total_qty
-			  FROM buildings_sub bs
-			  INNER JOIN CaseManagement cm ON cm.case_id = bs.case_id
+		$Qry="SELECT bs.case_id FROM buildings_sub bs
 			 WHERE bs.auto_seq = '$auto_seq_sql'
 			 LIMIT 1";
 		$mDB->query($Qry);
 		if ($mDB->rowCount() == 0) {
 			$mDB->remove();
-			$objResponse->script("jAlert('警示', '找不到案件數量資料，無法更新。', 'red', '', 2000);");
+			$objResponse->script("jAlert('警示', '找不到棟別資料，無法更新。', 'red', '', 2000);");
 			return $objResponse;
 		}
-		$case_qty_row = $mDB->fetchRow(2);
-		$std_layer_qty = addslashes($case_qty_row['tot_std_contract_layers']);
-		$roof_protrusion_qty = addslashes($case_qty_row['tot_houses_multi_floors']);
-		$layout_std_layer_qty = addslashes($case_qty_row['layout_std_floor_total_qty']);
-		$layout_roof_protrusion_qty = addslashes($case_qty_row['layout_roof_protrusion_total_qty']);
+		$building_row = $mDB->fetchRow(2);
+		$case_id_sql = addslashes($building_row['case_id']);
 
 		updateFloorCashflowGCModifyLogByBuildingSeq($mDB, $auto_seq, $memberID);
 	  
@@ -71,8 +80,15 @@ function processform($aFormValues){
 				,layout_roof_protrusion_qty	= '$layout_roof_protrusion_qty'
 				,makeby	= '$memberID'
 				,last_modify	= now()
-				where auto_seq = '$auto_seq'";
+				where auto_seq = '$auto_seq_sql'";
 				
+		$mDB->query($Qry);
+		$Qry="UPDATE CaseManagement cm SET
+			cm.tot_std_contract_layers = (SELECT COALESCE(SUM(std_layer_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.tot_houses_multi_floors = (SELECT COALESCE(SUM(roof_protrusion_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.layout_std_floor_total_qty = (SELECT COALESCE(SUM(layout_std_layer_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.layout_roof_protrusion_total_qty = (SELECT COALESCE(SUM(layout_roof_protrusion_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql')
+			WHERE cm.case_id = '$case_id_sql'";
 		$mDB->query($Qry);
         $mDB->remove();
 
@@ -145,14 +161,10 @@ if ($mDB->rowCount() > 0) {
 	$outsourcing = $row['outsourcing'];
 }
 
-// 顯示 CaseManagement 的合約／放樣總數量與單價。
+// 單價仍由 CaseManagement 提供，數量使用此棟別的 buildings_sub 資料。
 if (!empty($case_id)) {
 	$case_id_sql = addslashes($case_id);
-	$Qry="SELECT tot_std_contract_layers,
-				construction_id,
-				tot_houses_multi_floors,
-				layout_std_floor_total_qty,
-				layout_roof_protrusion_total_qty,
+	$Qry="SELECT construction_id,
 				std_floor_u_price,
 				roof_protrusion_u_price,
 				layout_std_floor_u_price,
@@ -164,10 +176,6 @@ if (!empty($case_id)) {
 	if ($mDB->rowCount() > 0) {
 		$case_qty_row = $mDB->fetchRow(2);
 		$construction_id = $case_qty_row['construction_id'];
-		$std_layer_qty = $case_qty_row['tot_std_contract_layers'];
-		$roof_protrusion_qty = $case_qty_row['tot_houses_multi_floors'];
-		$layout_std_layer_qty = $case_qty_row['layout_std_floor_total_qty'];
-		$layout_roof_protrusion_qty = $case_qty_row['layout_roof_protrusion_total_qty'];
 		$std_floor_u_price = $case_qty_row['std_floor_u_price'];
 		$roof_protrusion_u_price = $case_qty_row['roof_protrusion_u_price'];
 		$layout_std_floor_u_price = $case_qty_row['layout_std_floor_u_price'];
@@ -492,19 +500,19 @@ $style_css
 						<div class="edit_grid">
 							<div class="edit_item">
 								<div class="field_label">標準層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="std_layer_qty" name="std_layer_qty" size="20" value="$std_layer_qty" readonly/>
+								<input type="number" min="0" step="any" class="inputtext qty_input" id="std_layer_qty" name="std_layer_qty" size="20" value="$std_layer_qty" onchange="setEdit();"/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label">屋突層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" value="$roof_protrusion_qty" readonly/>
+								<input type="number" min="0" step="any" class="inputtext qty_input" id="roof_protrusion_qty" name="roof_protrusion_qty" size="20" value="$roof_protrusion_qty" onchange="setEdit();"/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label"><span class="label_highlight">放樣</span>標準層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" value="$layout_std_layer_qty" readonly/>
+								<input type="number" min="0" step="any" class="inputtext qty_input" id="layout_std_layer_qty" name="layout_std_layer_qty" size="20" value="$layout_std_layer_qty" onchange="setEdit();"/>
 							</div>
 							<div class="edit_item">
 								<div class="field_label"><span class="label_highlight">放樣</span>屋突層數量(M2)</div>
-								<input type="text" class="inputtext qty_input" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" value="$layout_roof_protrusion_qty" readonly/>
+								<input type="number" min="0" step="any" class="inputtext qty_input" id="layout_roof_protrusion_qty" name="layout_roof_protrusion_qty" size="20" value="$layout_roof_protrusion_qty" onchange="setEdit();"/>
 							</div>
 						</div>
 					</div>

@@ -98,11 +98,25 @@ function buildings_sub_DeleteRow($auto_seq){
 
 	$mDB = "";
 	$mDB = new MywebDB();
+	$auto_seq_sql = addslashes($auto_seq);
+	$Qry="SELECT case_id FROM buildings_sub WHERE auto_seq = '$auto_seq_sql' LIMIT 1";
+	$mDB->query($Qry);
+	$building_row = $mDB->fetchRow(2);
 	updateFloorCashflowGCModifyLogByBuildingSeq($mDB, $auto_seq, $_SESSION['memberID']);
 
 	//刪除主資料
-	$Qry="DELETE FROM buildings_sub WHERE auto_seq = '$auto_seq'";
+	$Qry="DELETE FROM buildings_sub WHERE auto_seq = '$auto_seq_sql'";
 	$mDB->query($Qry);
+	if ($building_row) {
+		$case_id_sql = addslashes($building_row['case_id']);
+		$Qry="UPDATE CaseManagement cm SET
+			cm.tot_std_contract_layers = (SELECT COALESCE(SUM(std_layer_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.tot_houses_multi_floors = (SELECT COALESCE(SUM(roof_protrusion_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.layout_std_floor_total_qty = (SELECT COALESCE(SUM(layout_std_layer_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql'),
+			cm.layout_roof_protrusion_total_qty = (SELECT COALESCE(SUM(layout_roof_protrusion_qty), 0) FROM buildings_sub WHERE case_id = '$case_id_sql')
+			WHERE cm.case_id = '$case_id_sql'";
+		$mDB->query($Qry);
+	}
 	
 	$mDB->remove();
 	

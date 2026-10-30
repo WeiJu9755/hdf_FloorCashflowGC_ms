@@ -293,12 +293,13 @@ $list_view=<<<EOT
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">實際收款</th>
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">未收金額</th>
 				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">樓層金流</th>
-				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">最後修改</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">人工修改</th>
+				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">自動修改時間</th>
 			</tr>
 		</thead>
 		<tbody class="table-group-divider">
 			<tr>
-				<td colspan="15" class="dataTables_empty">資料載入中...</td>
+				<td colspan="16" class="dataTables_empty">資料載入中...</td>
 			</tr>
 		</tbody>
 	</table>
@@ -490,6 +491,8 @@ $list_view
 				var lastModify = showText(18) ? '<div class="text-nowrap">'+moment(showText(18)).format('YYYY-MM-DD HH:mm')+'</div>' : '';
 				var memberName = showText(19) ? '<div class="text-nowrap">'+showText(19)+'</div>' : '';
 				$('td:eq(14)', nRow).html('<div class="text-center size12">'+lastModify+memberName+'</div>');
+				var autoLastModify = showText(20) ? moment(showText(20)).format('YYYY-MM-DD HH:mm') : '';
+				$('td:eq(15)', nRow).html('<div class="text-center size12 text-nowrap">'+autoLastModify+'</div>');
 
 
 				return nRow;

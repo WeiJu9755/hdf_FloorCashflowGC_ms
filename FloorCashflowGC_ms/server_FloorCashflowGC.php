@@ -52,7 +52,8 @@
 		'a.auto_seq',
 		'm.floor_cashflow_gc_makeby',
 		'm.floor_cashflow_gc_last_modify',
-		'f.member_name'
+		'f.member_name',
+		'm.floor_cashflow_gc_auto_last_modify'
 	);
 
 	$aSearchColumns = array(
