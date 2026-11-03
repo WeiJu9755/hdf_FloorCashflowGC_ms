@@ -53,7 +53,8 @@
 		'm.floor_cashflow_gc_makeby',
 		'm.floor_cashflow_gc_last_modify',
 		'f.member_name',
-		'm.floor_cashflow_gc_auto_last_modify'
+		'm.floor_cashflow_gc_auto_last_modify',
+		'COALESCE(gc.gc_pricing_completion, 0) AS gc_pricing_completion'
 	);
 
 	$aSearchColumns = array(
@@ -197,6 +198,19 @@
 			FROM buildings_sub_detail
 			GROUP BY case_id
 		) fd ON fd.case_id = a.case_id
+		LEFT JOIN (
+			SELECT case_id,
+				ROUND(SUM(floor_completed) * 100.0 / COUNT(*), 1) AS gc_pricing_completion
+			FROM (
+				-- 同樓層跨棟彙整，所有棟別的收款階段皆完成才計入分子。
+				SELECT case_id, floor,
+					MIN(CASE WHEN payment_request_stage = '已收款完成' THEN 1 ELSE 0 END) AS floor_completed
+				FROM buildings_sub_detail
+				WHERE floor IS NOT NULL AND TRIM(floor) <> ''
+				GROUP BY case_id, floor
+			) floor_progress
+			GROUP BY case_id
+		) gc ON gc.case_id = a.case_id
 		LEFT JOIN case_module_modify_log m ON m.case_id = a.case_id
 		LEFT JOIN memberinfo.member f on f.member_no = m.floor_cashflow_gc_makeby
 		$sWhere

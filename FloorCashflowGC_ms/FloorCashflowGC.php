@@ -292,6 +292,7 @@ $list_view=<<<EOT
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">預計收款</th>
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">實際收款</th>
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">未收金額</th>
+				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">上包計價<br>完成度</th>
 				<th class="text-center text-nowrap" style="width:5%;padding: 10px;background-color: #CBF3FC;">樓層金流</th>
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">人工修改</th>
 				<th class="text-center text-nowrap" style="width:7%;padding: 10px;background-color: #CBF3FC;">自動修改時間</th>
@@ -299,7 +300,7 @@ $list_view=<<<EOT
 		</thead>
 		<tbody class="table-group-divider">
 			<tr>
-				<td colspan="16" class="dataTables_empty">資料載入中...</td>
+				<td colspan="17" class="dataTables_empty">資料載入中...</td>
 			</tr>
 		</tbody>
 	</table>
@@ -483,16 +484,19 @@ $list_view
 				var outstanding = parseFloat(aData[15]);
 				var outstandingClass = (!isNaN(outstanding) && outstanding > 0) ? 'red weight' : 'blue02';
 				$('td:eq(12)', nRow).html('<div class="text-end size12 text-nowrap '+outstandingClass+'">'+showAmount(15)+'</div>');
+				var gcPricingCompletion = parseFloat(aData[21]);
+				if (isNaN(gcPricingCompletion)) gcPricingCompletion = 0;
+				$('td:eq(13)', nRow).html('<div class="text-center size12 text-nowrap red weight">'+gcPricingCompletion+'%</div>');
 
 				var url1 = "openfancybox_edit('/index.php?ch=edit&auto_seq="+showText(16)+"&fm=$fm',1900,'96%','');";
 				var showBtn = '<button type="button" class="btn btn-light btn-sm text-nowrap" onclick="'+url1+'" title="樓層金流"><i class="bi bi-building"></i>&nbsp;樓層金流</button>';
-				$('td:eq(13)', nRow).html('<div class="text-center">'+showBtn+'</div>');
+				$('td:eq(14)', nRow).html('<div class="text-center">'+showBtn+'</div>');
 
 				var lastModify = showText(18) ? '<div class="text-nowrap">'+moment(showText(18)).format('YYYY-MM-DD HH:mm')+'</div>' : '';
 				var memberName = showText(19) ? '<div class="text-nowrap">'+showText(19)+'</div>' : '';
-				$('td:eq(14)', nRow).html('<div class="text-center size12">'+lastModify+memberName+'</div>');
+				$('td:eq(15)', nRow).html('<div class="text-center size12">'+lastModify+memberName+'</div>');
 				var autoLastModify = showText(20) ? moment(showText(20)).format('YYYY-MM-DD HH:mm') : '';
-				$('td:eq(15)', nRow).html('<div class="text-center size12 text-nowrap">'+autoLastModify+'</div>');
+				$('td:eq(16)', nRow).html('<div class="text-center size12 text-nowrap">'+autoLastModify+'</div>');
 
 
 				return nRow;
