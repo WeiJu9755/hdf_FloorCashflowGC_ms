@@ -167,7 +167,7 @@ function apply_expected_work_qty($case_id,$memberID){
 	$retention_rate = get_case_retention_percentage_sum($mDB, $case_id_sql) / 100;
 	$advance_payment_rate = get_case_percentage_sum($mDB, "advance_payment", $case_id_sql) / 100;
 
-	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,gc_price_base_day1,gc_price_base_day2,tax_excluded FROM CaseManagement WHERE case_id = '$case_id_sql'";
+	$Qry="SELECT std_floor_u_price,roof_protrusion_u_price,layout_std_floor_u_price,square_roof_protrusion_u_price,gc_price_base_date,gc_price_base_day1,gc_price_base_day2,tax_excluded,ContractingModel FROM CaseManagement WHERE case_id = '$case_id_sql'";
 	$mDB->query($Qry);
 	if ($mDB->rowCount() == 0) {
 		$mDB->remove();
@@ -183,6 +183,8 @@ function apply_expected_work_qty($case_id,$memberID){
 	$gc_price_base_day1 = intval($case_row['gc_price_base_day1']);
 	$gc_price_base_day2 = intval($case_row['gc_price_base_day2']);
 	$tax_multiplier = is_tax_excluded_checked($case_row['tax_excluded']) ? 1.05 : 1;
+	// 材料買賣／租賃案件才套用「樓層合併計價」期數設定。
+	$floor_merge_enabled = is_floor_merge_contracting_model($case_row['ContractingModel']);
 
 	$Qry="SELECT * FROM buildings_sub WHERE case_id = '$case_id_sql' ORDER BY auto_seq";
 	$mDB->query($Qry);
@@ -231,6 +233,7 @@ function apply_expected_work_qty($case_id,$memberID){
 		}
 		usort($details, "compare_detail_floor_order");
 
+		$floor_results = array();
 		for ($j = 0; $j < count($details); $j++) {
 			$detail_row = $details[$j];
 			$floor_key = parse_single_floor_key($detail_row['floor']);
@@ -320,20 +323,48 @@ function apply_expected_work_qty($case_id,$memberID){
 			$second_expected_collection_date_1 = sql_date_value($expected_collection_dates[2]);
 			$second_expected_collection_date_2 = sql_date_value($expected_collection_dates[3]);
 
-			$detail_auto_seq = $detail_row['auto_seq'];
+			$floor_results[] = array(
+				"auto_seq" => $detail_row['auto_seq'],
+				"floor" => $detail_row['floor'],
+				"first_expected_work_qty" => $first_expected_work_qty,
+				"first_layout_expected_work_qty" => $first_layout_expected_work_qty,
+				"second_expected_work_qty" => $second_expected_work_qty,
+				"second_layout_expected_work_qty" => $second_layout_expected_work_qty,
+				"first_expected_collection_amount_1" => $first_expected_collection_amount_1,
+				"first_expected_collection_amount_2" => $first_expected_collection_amount_2,
+				"second_expected_collection_amount_1" => $second_expected_collection_amount_1,
+				"second_expected_collection_amount_2" => $second_expected_collection_amount_2,
+				"first_expected_collection_date_1" => $first_expected_collection_date_1,
+				"first_expected_collection_date_2" => $first_expected_collection_date_2,
+				"second_expected_collection_date_1" => $second_expected_collection_date_1,
+				"second_expected_collection_date_2" => $second_expected_collection_date_2
+			);
+		}
+
+		// 樓層合併計價：依期數樓層，把前面樓層的預計數量與金額加總到該期樓層。
+		if ($floor_merge_enabled) {
+			$period_floors = load_building_floor_periods($mDB, $case_id_sql, $building_sql);
+			if (count($period_floors) > 0) {
+				apply_floor_period_merge($floor_results, $period_floors, $building, $warning_list);
+			}
+		}
+
+		for ($k = 0; $k < count($floor_results); $k++) {
+			$r = $floor_results[$k];
+			$detail_auto_seq = addslashes($r['auto_seq']);
 			$Qry="UPDATE buildings_sub_detail SET
-				 first_expected_work_qty = $first_expected_work_qty
-				,first_layout_expected_work_qty = $first_layout_expected_work_qty
-				,second_expected_work_qty = $second_expected_work_qty
-				,second_layout_expected_work_qty = $second_layout_expected_work_qty
-				,first_expected_collection_amount_1 = $first_expected_collection_amount_1
-				,first_expected_collection_amount_2 = $first_expected_collection_amount_2
-				,second_expected_collection_amount_1 = $second_expected_collection_amount_1
-				,second_expected_collection_amount_2 = $second_expected_collection_amount_2
-				,first_expected_collection_date_1 = $first_expected_collection_date_1
-				,first_expected_collection_date_2 = $first_expected_collection_date_2
-				,second_expected_collection_date_1 = $second_expected_collection_date_1
-				,second_expected_collection_date_2 = $second_expected_collection_date_2
+				 first_expected_work_qty = {$r['first_expected_work_qty']}
+				,first_layout_expected_work_qty = {$r['first_layout_expected_work_qty']}
+				,second_expected_work_qty = {$r['second_expected_work_qty']}
+				,second_layout_expected_work_qty = {$r['second_layout_expected_work_qty']}
+				,first_expected_collection_amount_1 = {$r['first_expected_collection_amount_1']}
+				,first_expected_collection_amount_2 = {$r['first_expected_collection_amount_2']}
+				,second_expected_collection_amount_1 = {$r['second_expected_collection_amount_1']}
+				,second_expected_collection_amount_2 = {$r['second_expected_collection_amount_2']}
+				,first_expected_collection_date_1 = {$r['first_expected_collection_date_1']}
+				,first_expected_collection_date_2 = {$r['first_expected_collection_date_2']}
+				,second_expected_collection_date_1 = {$r['second_expected_collection_date_1']}
+				,second_expected_collection_date_2 = {$r['second_expected_collection_date_2']}
 				,makeby = '$memberID_sql'
 				,last_modify = now()
 				WHERE auto_seq = '$detail_auto_seq'";
@@ -359,6 +390,124 @@ function apply_expected_work_qty($case_id,$memberID){
 	$objResponse->script("art.dialog.tips('".$tip_text."',2);");
 
 	return $objResponse;
+}
+
+/**
+ * 判斷承攬模式是否可使用「樓層合併計價」（材料買賣、租賃）。
+ */
+function is_floor_merge_contracting_model($contracting_model) {
+	return in_array(trim((string)$contracting_model), array("材料買賣(BH)", "租賃(RH)"), true);
+}
+
+/**
+ * 讀取指定棟別的樓層合併計價期數，依樓層由低到高排序後回傳樓層文字清單。
+ */
+function load_building_floor_periods($mDB, $case_id_sql, $building_sql) {
+	$result = array();
+	$Qry="SELECT floor FROM buildings_sub_period WHERE case_id = '$case_id_sql' AND building = '$building_sql' ORDER BY period_no, auto_seq";
+	$mDB->query($Qry);
+	while ($row = $mDB->fetchRow(2)) {
+		if (parse_single_floor_key($row['floor']) != "") {
+			$result[] = $row['floor'];
+		}
+	}
+	usort($result, function($a, $b) {
+		$a_value = get_floor_sort_value($a);
+		$b_value = get_floor_sort_value($b);
+		if ($a_value == $b_value) {
+			return 0;
+		}
+		return ($a_value < $b_value) ? -1 : 1;
+	});
+	return $result;
+}
+
+/**
+ * 依期數樓層合併預計數量與預計收款金額：
+ * 上一期樓層（不含）到本期樓層（含）之間的樓層，數量與金額全部加總到本期樓層，其餘樓層歸零且清空預計收款日。
+ * 最後一期之後的樓層維持原本各樓層的計算結果。
+ */
+function apply_floor_period_merge(&$floor_results, $period_floors, $building, &$warning_list) {
+	$sum_fields = array(
+		"first_expected_work_qty",
+		"first_layout_expected_work_qty",
+		"second_expected_work_qty",
+		"second_layout_expected_work_qty",
+		"first_expected_collection_amount_1",
+		"first_expected_collection_amount_2",
+		"second_expected_collection_amount_1",
+		"second_expected_collection_amount_2"
+	);
+	$date_fields = array(
+		"first_expected_collection_date_1",
+		"first_expected_collection_date_2",
+		"second_expected_collection_date_1",
+		"second_expected_collection_date_2"
+	);
+
+	$period_values = array();
+	for ($p = 0; $p < count($period_floors); $p++) {
+		$period_values[$p] = get_floor_sort_value($period_floors[$p]);
+	}
+
+	// 依樓層歸入期數
+	$groups = array();
+	for ($i = 0; $i < count($floor_results); $i++) {
+		$floor_value = get_floor_sort_value($floor_results[$i]['floor']);
+		for ($p = 0; $p < count($period_values); $p++) {
+			if ($floor_value <= $period_values[$p]) {
+				$groups[$p][] = $i;
+				break;
+			}
+		}
+	}
+
+	foreach ($groups as $p => $indexes) {
+		$target_index = -1;
+		$target_key = parse_single_floor_key($period_floors[$p]);
+		for ($n = 0; $n < count($indexes); $n++) {
+			if (parse_single_floor_key($floor_results[$indexes[$n]]['floor']) == $target_key) {
+				$target_index = $indexes[$n];
+				break;
+			}
+		}
+		if ($target_index < 0) {
+			$warning_list[] = $building." 第".($p + 1)."期樓層 ".$period_floors[$p]." 不在可計算的標準層／屋突層範圍，該期未合併";
+			continue;
+		}
+
+		$totals = array();
+		$has_value = array();
+		foreach ($sum_fields as $field) {
+			$totals[$field] = 0;
+			$has_value[$field] = false;
+		}
+		for ($n = 0; $n < count($indexes); $n++) {
+			$row = $floor_results[$indexes[$n]];
+			foreach ($sum_fields as $field) {
+				if ($row[$field] !== "NULL" && $row[$field] !== null && $row[$field] !== "") {
+					$totals[$field] += floatval($row[$field]);
+					$has_value[$field] = true;
+				}
+			}
+		}
+
+		for ($n = 0; $n < count($indexes); $n++) {
+			$idx = $indexes[$n];
+			if ($idx == $target_index) {
+				foreach ($sum_fields as $field) {
+					$floor_results[$idx][$field] = $has_value[$field] ? round($totals[$field], 2) : "NULL";
+				}
+			} else {
+				foreach ($sum_fields as $field) {
+					$floor_results[$idx][$field] = 0;
+				}
+				foreach ($date_fields as $field) {
+					$floor_results[$idx][$field] = "NULL";
+				}
+			}
+		}
+	}
 }
 
 /**

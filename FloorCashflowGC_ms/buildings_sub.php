@@ -30,6 +30,14 @@ $Cancel = getlang("取消");
 $buildings_sub_row = getkeyvalue2($site_db."_info","buildings_sub","case_id = '$case_id' LIMIT 1","building");
 $building = $buildings_sub_row['building'];
 
+//承攬模式為「材料買賣」或「租賃」時，才顯示「樓層合併計價」按鈕
+$case_mode_row = getkeyvalue2($site_db."_info","CaseManagement","case_id = '$case_id'","ContractingModel");
+$ContractingModel = trim($case_mode_row['ContractingModel']);
+$show_floor_merge_btn = "";
+if (in_array($ContractingModel, array("材料買賣(BH)", "租賃(RH)"), true)) {
+	$show_floor_merge_btn = "<button type=\"button\" class=\"btn btn-warning btn-sm text-nowrap mb-1 ms-1\" onclick=\"openFloorMergePeriod();\"><i class=\"bi bi-layers\"></i>&nbsp;樓層合併計價</button>";
+}
+
 /*
 $show_fellow_btn=<<<EOT
 <div class="btn-group" role="group">
@@ -48,6 +56,7 @@ $list_view=<<<EOT
 					<div>
 						<div class="inline size14 weight text-nowrap me-5">總棟數</div>
 						<button type="button" class="btn btn-primary btn-sm text-nowrap mb-1" onclick="applyExpectedWorkQty();"><i class="bi bi-calculator"></i>&nbsp;套用預計數量/金額/收款日</button>
+						$show_floor_merge_btn
 					</div>
 					<div>
 						<table class="table table-bordered border-dark w-100" id="buildings_sub_table">
@@ -286,7 +295,15 @@ function applyExpectedWorkQty() {
 
 
 
+//樓層合併計價：開啟期數設定視窗，預設帶入目前選取的棟別
+var currentBuilding = "$building";
+function openFloorMergePeriod() {
+	openfancybox_edit('/index.php?ch=buildings_sub_period&case_id=$case_id&building='+encodeURIComponent(currentBuilding)+'&fm=$fm',800,'96%','');
+}
+
 function LoadBuilding(building) {
+
+currentBuilding = building;
 
 var site_db = "$site_db"; 
 var case_id = "$case_id"; 
