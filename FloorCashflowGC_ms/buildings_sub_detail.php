@@ -273,7 +273,7 @@ $list_view
 						values.push('');
 					}
 					for (var i = 0; i < values.length; i++) {
-						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 0) : '';
 					}
 					return '<div class="work-qty-box">'
 						+'<div class="work-qty-line"><span class="work-qty-label">第一次數量：</span><span class="work-qty-value first-stage-value">'+values[0]+'</span><span class="work-qty-gap"></span><span class="work-qty-label">第一次放樣：</span><span class="work-qty-value first-stage-value">'+values[1]+'</span></div>'
@@ -287,7 +287,7 @@ $list_view
 						values.push('');
 					}
 					for (var i = 0; i < values.length; i++) {
-						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 2) : '';
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 0) : '';
 					}
 					return '<div class="collection-amount-box">'
 						+'<div class="collection-amount-line"><span class="collection-amount-label">第一次之一：</span><span class="collection-amount-value first-stage-value">'+values[0]+'</span><span class="collection-amount-gap"></span><span class="collection-amount-label">第一次之二：</span><span class="collection-amount-value first-stage-value">'+values[1]+'</span></div>'
@@ -301,7 +301,7 @@ $list_view
 						values.push('');
 					}
 					for (var i = 0; i < values.length; i++) {
-						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], (i == 2 || i == 5) ? 2 : 0) : '';
+						values[i] = (values[i] != null && values[i] != '' && values[i] != 0) ? number_format(values[i], 0) : '';
 					}
 					return '<div class="actual-completed-box">'
 						+'<div class="actual-completed-line"><span class="actual-completed-stage">第一次</span><span class="actual-completed-label">計價：</span><span class="actual-completed-value first-stage-value">'+values[0]+'</span><span class="actual-completed-label">放樣：</span><span class="actual-completed-value first-stage-value">'+values[1]+'</span><span class="actual-completed-label">實際金額：</span><span class="actual-completed-value actual-completed-amount first-stage-value">'+values[2]+'</span></div>'

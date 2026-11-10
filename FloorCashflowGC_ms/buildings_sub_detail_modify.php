@@ -209,8 +209,8 @@ function processform($aFormValues){
 
 	$objResponse->script("setSave();");
 	$objResponse->script("showSaveNotice('已存檔!');");
-	$objResponse->script("$('#first_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['first_actual_billing_amount']), 2)."');");
-	$objResponse->script("$('#second_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_billing_amount']), 2)."');");
+	$objResponse->script("$('#first_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['first_actual_billing_amount']), 0)."');");
+	$objResponse->script("$('#second_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_billing_amount']), 0)."');");
 	$objResponse->script("$('#first_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][0]), 0)."');");
 	$objResponse->script("$('#first_actual_invoice_amount_2_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][1]), 0)."');");
 	$objResponse->script("$('#second_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][2]), 0)."');");
@@ -785,24 +785,24 @@ if ($first_actual_completed_qty != "" || $second_actual_completed_qty != "") {
 
 $mDB->remove();
 
-$show_first_expected_collection_amount_1 = ($first_expected_collection_amount_1 != "" && $first_expected_collection_amount_1 != 0) ? number_format($first_expected_collection_amount_1, 2) : "";
-$show_first_expected_collection_amount_2 = ($first_expected_collection_amount_2 != "" && $first_expected_collection_amount_2 != 0) ? number_format($first_expected_collection_amount_2, 2) : "";
-$show_second_expected_collection_amount_1 = ($second_expected_collection_amount_1 != "" && $second_expected_collection_amount_1 != 0) ? number_format($second_expected_collection_amount_1, 2) : "";
-$show_second_expected_collection_amount_2 = ($second_expected_collection_amount_2 != "" && $second_expected_collection_amount_2 != 0) ? number_format($second_expected_collection_amount_2, 2) : "";
-$show_first_expected_work_qty = ($first_expected_work_qty !== "" && $first_expected_work_qty !== null) ? number_format($first_expected_work_qty, 2) : "";
-$show_first_layout_expected_work_qty = ($first_layout_expected_work_qty !== "" && $first_layout_expected_work_qty !== null) ? number_format($first_layout_expected_work_qty, 2) : "";
-$show_second_expected_work_qty = ($second_expected_work_qty !== "" && $second_expected_work_qty !== null) ? number_format($second_expected_work_qty, 2) : "";
-$show_second_layout_expected_work_qty = ($second_layout_expected_work_qty !== "" && $second_layout_expected_work_qty !== null) ? number_format($second_layout_expected_work_qty, 2) : "";
-$show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
-$show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
+$show_first_expected_collection_amount_1 = ($first_expected_collection_amount_1 != "" && $first_expected_collection_amount_1 != 0) ? number_format($first_expected_collection_amount_1, 0) : "";
+$show_first_expected_collection_amount_2 = ($first_expected_collection_amount_2 != "" && $first_expected_collection_amount_2 != 0) ? number_format($first_expected_collection_amount_2, 0) : "";
+$show_second_expected_collection_amount_1 = ($second_expected_collection_amount_1 != "" && $second_expected_collection_amount_1 != 0) ? number_format($second_expected_collection_amount_1, 0) : "";
+$show_second_expected_collection_amount_2 = ($second_expected_collection_amount_2 != "" && $second_expected_collection_amount_2 != 0) ? number_format($second_expected_collection_amount_2, 0) : "";
+$show_first_expected_work_qty = ($first_expected_work_qty !== "" && $first_expected_work_qty !== null) ? number_format($first_expected_work_qty, 0) : "";
+$show_first_layout_expected_work_qty = ($first_layout_expected_work_qty !== "" && $first_layout_expected_work_qty !== null) ? number_format($first_layout_expected_work_qty, 0) : "";
+$show_second_expected_work_qty = ($second_expected_work_qty !== "" && $second_expected_work_qty !== null) ? number_format($second_expected_work_qty, 0) : "";
+$show_second_layout_expected_work_qty = ($second_layout_expected_work_qty !== "" && $second_layout_expected_work_qty !== null) ? number_format($second_layout_expected_work_qty, 0) : "";
+$show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 0) : "";
+$show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 0) : "";
 $show_first_other_deduction_amount = ($first_other_deduction_amount != "" && $first_other_deduction_amount != 0) ? number_format($first_other_deduction_amount, 0) : "";
-$show_second_retention_deduction_amount = ($second_retention_deduction_amount != "" && $second_retention_deduction_amount != 0) ? number_format($second_retention_deduction_amount, 2) : "";
-$show_second_advance_payment_deduction_amount = ($second_advance_payment_deduction_amount != "" && $second_advance_payment_deduction_amount != 0) ? number_format($second_advance_payment_deduction_amount, 2) : "";
+$show_second_retention_deduction_amount = ($second_retention_deduction_amount != "" && $second_retention_deduction_amount != 0) ? number_format($second_retention_deduction_amount, 0) : "";
+$show_second_advance_payment_deduction_amount = ($second_advance_payment_deduction_amount != "" && $second_advance_payment_deduction_amount != 0) ? number_format($second_advance_payment_deduction_amount, 0) : "";
 $show_second_other_deduction_amount = ($second_other_deduction_amount != "" && $second_other_deduction_amount != 0) ? number_format($second_other_deduction_amount, 0) : "";
 $show_first_other_addition_amount = ($first_other_addition_amount != "" && $first_other_addition_amount != 0) ? number_format($first_other_addition_amount, 0) : "";
 $show_second_other_addition_amount = ($second_other_addition_amount != "" && $second_other_addition_amount != 0) ? number_format($second_other_addition_amount, 0) : "";
-$show_first_actual_billing_amount = ($first_actual_billing_amount != "" && $first_actual_billing_amount != 0) ? number_format($first_actual_billing_amount, 2) : "";
-$show_second_actual_billing_amount = ($second_actual_billing_amount != "" && $second_actual_billing_amount != 0) ? number_format($second_actual_billing_amount, 2) : "";
+$show_first_actual_billing_amount = ($first_actual_billing_amount != "" && $first_actual_billing_amount != 0) ? number_format($first_actual_billing_amount, 0) : "";
+$show_second_actual_billing_amount = ($second_actual_billing_amount != "" && $second_actual_billing_amount != 0) ? number_format($second_actual_billing_amount, 0) : "";
 $show_first_actual_invoice_amount_1 = number_format(floatval($first_actual_invoice_amount_1), 0);
 $show_first_actual_invoice_amount_2 = number_format(floatval($first_actual_invoice_amount_2), 0);
 $show_second_actual_invoice_amount_1 = number_format(floatval($second_actual_invoice_amount_1), 0);
