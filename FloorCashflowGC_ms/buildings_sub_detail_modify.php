@@ -48,17 +48,19 @@ function processform($aFormValues){
 	$second_actual_billing_date_1		= trim($aFormValues['second_actual_billing_date_1']);
 	$second_actual_billing_date_2		= trim($aFormValues['second_actual_billing_date_2']);
 	$project_progress					= trim($aFormValues['project_progress']);
-	$first_actual_completed_qty			= normalize_amount_for_sql($aFormValues['first_actual_completed_qty']);
-	$second_actual_completed_qty		= normalize_amount_for_sql($aFormValues['second_actual_completed_qty']);
-	$first_layout_actual_completed_qty	= normalize_amount_for_sql($aFormValues['first_layout_actual_completed_qty']);
-	$second_layout_actual_completed_qty	= normalize_amount_for_sql($aFormValues['second_layout_actual_completed_qty']);
-	$completed_qty						= normalize_amount_for_sql(floatval($first_actual_completed_qty) + floatval($second_actual_completed_qty));
+	$first_actual_completed_qty			= normalize_money_for_sql($aFormValues['first_actual_completed_qty']);
+	$second_actual_completed_qty		= normalize_money_for_sql($aFormValues['second_actual_completed_qty']);
+	$first_layout_actual_completed_qty	= normalize_money_for_sql($aFormValues['first_layout_actual_completed_qty']);
+	$second_layout_actual_completed_qty	= normalize_money_for_sql($aFormValues['second_layout_actual_completed_qty']);
+	$completed_qty						= normalize_money_for_sql(floatval($first_actual_completed_qty) + floatval($second_actual_completed_qty));
 	$first_actual_collection_date		= trim($aFormValues['first_actual_collection_date']);
 	$first_layout_actual_collection_date	= trim($aFormValues['first_layout_actual_collection_date']);
 	$second_actual_collection_date		= trim($aFormValues['second_actual_collection_date']);
 	$second_layout_actual_collection_date	= trim($aFormValues['second_layout_actual_collection_date']);
 	$first_other_deduction_amount		= normalize_money_for_sql($aFormValues['first_other_deduction_amount']);
 	$second_other_deduction_amount		= normalize_money_for_sql($aFormValues['second_other_deduction_amount']);
+	$first_other_addition_amount		= normalize_money_for_sql(isset($aFormValues['first_other_addition_amount']) ? $aFormValues['first_other_addition_amount'] : 0);
+	$second_other_addition_amount		= normalize_money_for_sql(isset($aFormValues['second_other_addition_amount']) ? $aFormValues['second_other_addition_amount'] : 0);
 	$retention_deduction_source			= deduction_source_from_checkbox($aFormValues, 'retention_deduction_source_manual');
 	$advance_payment_deduction_source	= deduction_source_from_checkbox($aFormValues, 'advance_payment_deduction_source_manual');
 	$second_retention_deduction_source	= deduction_source_from_checkbox($aFormValues, 'second_retention_deduction_source_manual');
@@ -122,7 +124,9 @@ function processform($aFormValues){
 		floatval($first_other_deduction_amount),
 		floatval($second_retention_deduction_amount),
 		floatval($second_advance_payment_deduction_amount),
-		floatval($second_other_deduction_amount)
+		floatval($second_other_deduction_amount),
+		floatval($first_other_addition_amount),
+		floatval($second_other_addition_amount)
 	);
 	if (!$actual_collection_result['ok']) {
 		$mDB->remove();
@@ -187,11 +191,13 @@ function processform($aFormValues){
 			,advance_payment_deduction_amount	= $advance_payment_deduction_amount
 			,advance_payment_deduction_source	= '$advance_payment_deduction_source'
 			,first_other_deduction_amount	= $first_other_deduction_amount
+			,first_other_addition_amount	= $first_other_addition_amount
 			,second_retention_deduction_amount	= $second_retention_deduction_amount
 			,second_retention_deduction_source	= '$second_retention_deduction_source'
 			,second_advance_payment_deduction_amount	= $second_advance_payment_deduction_amount
 			,second_advance_payment_deduction_source	= '$second_advance_payment_deduction_source'
 			,second_other_deduction_amount	= $second_other_deduction_amount
+			,second_other_addition_amount	= $second_other_addition_amount
 			,payment_request_stage	= '$payment_request_stage'
 			,remark	= '$remark'
 			,makeby	= '$memberID'
@@ -205,10 +211,10 @@ function processform($aFormValues){
 	$objResponse->script("showSaveNotice('已存檔!');");
 	$objResponse->script("$('#first_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['first_actual_billing_amount']), 2)."');");
 	$objResponse->script("$('#second_actual_billing_amount_preview').val('".number_format(floatval($actual_collection_result['second_actual_billing_amount']), 2)."');");
-	$objResponse->script("$('#first_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][0]), 2)."');");
-	$objResponse->script("$('#first_actual_invoice_amount_2_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][1]), 2)."');");
-	$objResponse->script("$('#second_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][2]), 2)."');");
-	$objResponse->script("$('#second_actual_invoice_amount_2_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][3]), 2)."');");
+	$objResponse->script("$('#first_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][0]), 0)."');");
+	$objResponse->script("$('#first_actual_invoice_amount_2_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][1]), 0)."');");
+	$objResponse->script("$('#second_actual_invoice_amount_1_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][2]), 0)."');");
+	$objResponse->script("$('#second_actual_invoice_amount_2_preview').val('".number_format(floatval($actual_collection_result['invoice_parts'][3]), 0)."');");
 	$objResponse->script("$('#first_actual_collection_amount_1').val('".number_format(floatval($first_actual_collection_amount_1), 0, '.', '')."');");
 	$objResponse->script("$('#first_actual_collection_amount_2').val('".number_format(floatval($first_actual_collection_amount_2), 0, '.', '')."');");
 	$objResponse->script("$('#second_actual_collection_amount_1').val('".number_format(floatval($second_actual_collection_amount_1), 0, '.', '')."');");
@@ -256,7 +262,7 @@ function deduction_source_from_checkbox($form_values, $field_name) {
 /**
  * 實際計價與扣抵款均依案件原稅別保存；開票與收款時計為含稅金額後再扣抵，避免含稅減未稅。
  */
-function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_retention_amount, $first_advance_payment_amount, $first_other_deduction_amount, $second_retention_amount, $second_advance_payment_amount, $second_other_deduction_amount) {
+function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_completed_qty, $second_actual_completed_qty, $first_layout_actual_completed_qty, $second_layout_actual_completed_qty, $first_retention_amount, $first_advance_payment_amount, $first_other_deduction_amount, $second_retention_amount, $second_advance_payment_amount, $second_other_deduction_amount, $first_other_addition_amount = 0, $second_other_addition_amount = 0) {
 	$auto_seq_sql = addslashes($auto_seq);
 	$Qry="SELECT
 			 a.floor,
@@ -310,52 +316,61 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 	$second_retention_amount = floatval($second_retention_amount);
 	$second_advance_payment_amount = floatval($second_advance_payment_amount);
 	$second_other_deduction_amount = floatval($second_other_deduction_amount);
+	$first_other_addition_amount = floatval($first_other_addition_amount);
+	$second_other_addition_amount = floatval($second_other_addition_amount);
 	$tax_multiplier = actual_collection_is_tax_excluded($row['tax_excluded']) ? 1.05 : 1;
 	// 實際金額與所有扣抵款維持案件原稅別：未稅案件即為未稅，含稅案件即為含稅。
 	$first_actual_billing_amount = round(($unit_price * $first_qty) + ($layout_unit_price * $first_layout_qty), 2);
 	$second_actual_billing_amount = round(($unit_price * $second_qty) + ($layout_unit_price * $second_layout_qty), 2);
 
 	// 實開發票與實際收款一律以含稅金額計算，未稅案件在此才加計營業稅。
+	// 其他加款固定為未稅金額，不論案件稅別，一律乘以 1.05 後加入實開發票及實際收款金額。
 	$first_actual_invoice_total = round(
 		actual_collection_tax_included_amount($first_actual_billing_amount, $tax_multiplier)
 		- actual_collection_tax_included_amount($first_advance_payment_amount, $tax_multiplier)
-		- actual_collection_tax_included_amount($first_other_deduction_amount, $tax_multiplier),
-		2
+		- actual_collection_tax_included_amount($first_other_deduction_amount, $tax_multiplier)
+		+ actual_collection_tax_included_amount($first_other_addition_amount, 1.05),
+		0
 	);
 	$second_actual_invoice_total = round(
 		actual_collection_tax_included_amount($second_actual_billing_amount, $tax_multiplier)
 		- actual_collection_tax_included_amount($second_advance_payment_amount, $tax_multiplier)
-		- actual_collection_tax_included_amount($second_other_deduction_amount, $tax_multiplier),
-		2
+		- actual_collection_tax_included_amount($second_other_deduction_amount, $tax_multiplier)
+		+ actual_collection_tax_included_amount($second_other_addition_amount, 1.05),
+		0
 	);
 	$first_actual_collection_total = round(
 		$first_actual_invoice_total - actual_collection_tax_included_amount($first_retention_amount, $tax_multiplier),
-		2
+		0
 	);
 	$second_actual_collection_total = round(
 		$second_actual_invoice_total - actual_collection_tax_included_amount($second_retention_amount, $tax_multiplier),
-		2
+		0
 	);
 
 	$first_invoice_parts = split_actual_amount_by_receiving_percentages(
 		$first_actual_invoice_total,
 		$fp_receiving_percent_1,
-		$fp_receiving_percent_2
+		$fp_receiving_percent_2,
+		0
 	);
 	$second_invoice_parts = split_actual_amount_by_receiving_percentages(
 		$second_actual_invoice_total,
 		$sp_receiving_percent_1,
-		$sp_receiving_percent_2
+		$sp_receiving_percent_2,
+		0
 	);
 	$first_collection_parts = split_actual_amount_by_receiving_percentages(
 		$first_actual_collection_total,
 		$fp_receiving_percent_1,
-		$fp_receiving_percent_2
+		$fp_receiving_percent_2,
+		0
 	);
 	$second_collection_parts = split_actual_amount_by_receiving_percentages(
 		$second_actual_collection_total,
 		$sp_receiving_percent_1,
-		$sp_receiving_percent_2
+		$sp_receiving_percent_2,
+		0
 	);
 	$invoice_parts = array(
 		$first_invoice_parts[0],
@@ -369,24 +384,24 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 		$second_collection_parts[0],
 		$second_collection_parts[1]
 	);
-	$total_amount = round(array_sum($parts), 2);
+	$total_amount = round(array_sum($parts), 0);
 
 	return array(
 		'ok' => true,
-		'total_amount' => number_format($total_amount, 2, '.', ''),
+		'total_amount' => number_format($total_amount, 0, '.', ''),
 		'first_actual_billing_amount' => number_format($first_actual_billing_amount, 2, '.', ''),
 		'second_actual_billing_amount' => number_format($second_actual_billing_amount, 2, '.', ''),
 		'invoice_parts' => array(
-			number_format($invoice_parts[0], 2, '.', ''),
-			number_format($invoice_parts[1], 2, '.', ''),
-			number_format($invoice_parts[2], 2, '.', ''),
-			number_format($invoice_parts[3], 2, '.', '')
+			number_format($invoice_parts[0], 0, '.', ''),
+			number_format($invoice_parts[1], 0, '.', ''),
+			number_format($invoice_parts[2], 0, '.', ''),
+			number_format($invoice_parts[3], 0, '.', '')
 		),
 		'parts' => array(
-			number_format($parts[0], 2, '.', ''),
-			number_format($parts[1], 2, '.', ''),
-			number_format($parts[2], 2, '.', ''),
-			number_format($parts[3], 2, '.', '')
+			number_format($parts[0], 0, '.', ''),
+			number_format($parts[1], 0, '.', ''),
+			number_format($parts[2], 0, '.', ''),
+			number_format($parts[3], 0, '.', '')
 		)
 	);
 }
@@ -394,19 +409,19 @@ function calculate_actual_collection_amounts($mDB, $auto_seq, $first_actual_comp
 /**
  * 依上包收款比例將第一次或第二次的含稅總額拆成之一、之二；合計 100% 時由之二吸收尾差。
  */
-function split_actual_amount_by_receiving_percentages($total_amount, $first_percent, $second_percent) {
+function split_actual_amount_by_receiving_percentages($total_amount, $first_percent, $second_percent, $precision = 2) {
 	$total_amount = floatval($total_amount);
 	$first_percent = max(0, floatval($first_percent));
 	$second_percent = max(0, floatval($second_percent));
 
 	if ($first_percent == 0 && $second_percent == 0) {
-		return array(round($total_amount, 2), 0);
+		return array(round($total_amount, $precision), 0);
 	}
 
-	$first_amount = ($first_percent > 0) ? round($total_amount * $first_percent / 100, 2) : 0;
-	$second_amount = ($second_percent > 0) ? round($total_amount * $second_percent / 100, 2) : 0;
+	$first_amount = ($first_percent > 0) ? round($total_amount * $first_percent / 100, $precision) : 0;
+	$second_amount = ($second_percent > 0) ? round($total_amount * $second_percent / 100, $precision) : 0;
 	if ($first_percent > 0 && $second_percent > 0 && abs(($first_percent + $second_percent) - 100) < 0.00001) {
-		$second_amount = round($total_amount - $first_amount, 2);
+		$second_amount = round($total_amount - $first_amount, $precision);
 	}
 
 	return array($first_amount, $second_amount);
@@ -583,6 +598,8 @@ $second_retention_deduction_source = "auto";
 $second_advance_payment_deduction_amount = "";
 $second_advance_payment_deduction_source = "auto";
 $second_other_deduction_amount = "";
+$first_other_addition_amount = "";
+$second_other_addition_amount = "";
 $first_expected_collection_date_1 = "";
 $first_expected_collection_date_2 = "";
 $second_expected_collection_date_1 = "";
@@ -659,6 +676,8 @@ if ($total > 0) {
 	$second_advance_payment_deduction_amount = $row['second_advance_payment_deduction_amount'];
 	$second_advance_payment_deduction_source = normalize_deduction_source($row['second_advance_payment_deduction_source']);
 	$second_other_deduction_amount = money_round_int($row['second_other_deduction_amount']);
+	$first_other_addition_amount = money_round_int($row['first_other_addition_amount']);
+	$second_other_addition_amount = money_round_int($row['second_other_addition_amount']);
 	$first_expected_collection_date_1 = $row['first_expected_collection_date_1'];
 	$first_expected_collection_date_2 = $row['first_expected_collection_date_2'];
 	$second_expected_collection_date_1 = $row['second_expected_collection_date_1'];
@@ -718,6 +737,11 @@ if ($first_layout_actual_completed_qty == "" && $second_layout_actual_completed_
 	$first_layout_actual_completed_qty = $first_actual_completed_qty;
 	$second_layout_actual_completed_qty = $second_actual_completed_qty;
 }
+// 實際計價與放樣數量一律四捨五入到整數
+$first_actual_completed_qty = money_round_int($first_actual_completed_qty);
+$second_actual_completed_qty = money_round_int($second_actual_completed_qty);
+$first_layout_actual_completed_qty = money_round_int($first_layout_actual_completed_qty);
+$second_layout_actual_completed_qty = money_round_int($second_layout_actual_completed_qty);
 
 if ($first_actual_completed_qty != "" || $second_actual_completed_qty != "") {
 	$preview_collection_result = calculate_actual_collection_amounts(
@@ -732,7 +756,9 @@ if ($first_actual_completed_qty != "" || $second_actual_completed_qty != "") {
 		floatval($first_other_deduction_amount),
 		floatval($second_retention_deduction_amount),
 		floatval($second_advance_payment_deduction_amount),
-		floatval($second_other_deduction_amount)
+		floatval($second_other_deduction_amount),
+		floatval($first_other_addition_amount),
+		floatval($second_other_addition_amount)
 	);
 	if ($preview_collection_result['ok']) {
 		// 顯示值一律依目前案件稅別重算，避免案件稅別異動後仍顯示舊的含／未稅結果。
@@ -769,16 +795,18 @@ $show_second_expected_work_qty = ($second_expected_work_qty !== "" && $second_ex
 $show_second_layout_expected_work_qty = ($second_layout_expected_work_qty !== "" && $second_layout_expected_work_qty !== null) ? number_format($second_layout_expected_work_qty, 2) : "";
 $show_retention_deduction_amount = ($retention_deduction_amount != "" && $retention_deduction_amount != 0) ? number_format($retention_deduction_amount, 2) : "";
 $show_advance_payment_deduction_amount = ($advance_payment_deduction_amount != "" && $advance_payment_deduction_amount != 0) ? number_format($advance_payment_deduction_amount, 2) : "";
-$show_first_other_deduction_amount = ($first_other_deduction_amount != "" && $first_other_deduction_amount != 0) ? number_format($first_other_deduction_amount, 2) : "";
+$show_first_other_deduction_amount = ($first_other_deduction_amount != "" && $first_other_deduction_amount != 0) ? number_format($first_other_deduction_amount, 0) : "";
 $show_second_retention_deduction_amount = ($second_retention_deduction_amount != "" && $second_retention_deduction_amount != 0) ? number_format($second_retention_deduction_amount, 2) : "";
 $show_second_advance_payment_deduction_amount = ($second_advance_payment_deduction_amount != "" && $second_advance_payment_deduction_amount != 0) ? number_format($second_advance_payment_deduction_amount, 2) : "";
-$show_second_other_deduction_amount = ($second_other_deduction_amount != "" && $second_other_deduction_amount != 0) ? number_format($second_other_deduction_amount, 2) : "";
+$show_second_other_deduction_amount = ($second_other_deduction_amount != "" && $second_other_deduction_amount != 0) ? number_format($second_other_deduction_amount, 0) : "";
+$show_first_other_addition_amount = ($first_other_addition_amount != "" && $first_other_addition_amount != 0) ? number_format($first_other_addition_amount, 0) : "";
+$show_second_other_addition_amount = ($second_other_addition_amount != "" && $second_other_addition_amount != 0) ? number_format($second_other_addition_amount, 0) : "";
 $show_first_actual_billing_amount = ($first_actual_billing_amount != "" && $first_actual_billing_amount != 0) ? number_format($first_actual_billing_amount, 2) : "";
 $show_second_actual_billing_amount = ($second_actual_billing_amount != "" && $second_actual_billing_amount != 0) ? number_format($second_actual_billing_amount, 2) : "";
-$show_first_actual_invoice_amount_1 = number_format(floatval($first_actual_invoice_amount_1), 2);
-$show_first_actual_invoice_amount_2 = number_format(floatval($first_actual_invoice_amount_2), 2);
-$show_second_actual_invoice_amount_1 = number_format(floatval($second_actual_invoice_amount_1), 2);
-$show_second_actual_invoice_amount_2 = number_format(floatval($second_actual_invoice_amount_2), 2);
+$show_first_actual_invoice_amount_1 = number_format(floatval($first_actual_invoice_amount_1), 0);
+$show_first_actual_invoice_amount_2 = number_format(floatval($first_actual_invoice_amount_2), 0);
+$show_second_actual_invoice_amount_1 = number_format(floatval($second_actual_invoice_amount_1), 0);
+$show_second_actual_invoice_amount_2 = number_format(floatval($second_actual_invoice_amount_2), 0);
 $actual_amount_tax_label = actual_collection_is_tax_excluded($tax_excluded) ? "未稅" : "含稅";
 $show_expected_collection_amount = "
 	<div class=\"summary_line\"><span>第一次之一：</span><b>$show_first_expected_collection_amount_1</b><span class=\"summary_gap\"></span><span>第一次之二：</span><b>$show_first_expected_collection_amount_2</b></div>
@@ -860,7 +888,7 @@ $show_actual_invoice_amount_inputs = "
 			<input type=\"text\" class=\"form-control actual_field\" id=\"second_actual_invoice_amount_2_preview\" value=\"$show_second_actual_invoice_amount_2\" readonly>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 第一次／第二次實開發票含稅總額，依上包收款比例拆為之一、之二。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 第一次／第二次實開發票含稅總額（含其他加款 × 1.05），依上包收款比例拆為之一、之二。</div>
 ";
 
 $show_actual_collection_amount_inputs = "
@@ -908,15 +936,17 @@ $show_deduction_amount_inputs = "
 			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div>".build_deduction_amount_input("retention_deduction_amount", "retention_deduction_source", $retention_deduction_amount, $retention_deduction_source)."</div>
 			<div><div class=\"actual_label\">扣抵預收款</div>".build_deduction_amount_input("advance_payment_deduction_amount", "advance_payment_deduction_source", $advance_payment_deduction_amount, $advance_payment_deduction_source)."</div>
 			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"first_other_deduction_amount\" value=\"$first_other_deduction_amount\" onchange=\"moneyRoundIntInput(this);setEdit();\"></div>
+			<div><div class=\"actual_label\">其他加款(未稅)</div><input type=\"number\" step=\"1\" class=\"form-control actual_field\" name=\"first_other_addition_amount\" value=\"$first_other_addition_amount\" onchange=\"moneyRoundIntInput(this);setEdit();\"></div>
 		</div>
 		<div class=\"deduction_stage_panel\">
 			<div class=\"deduction_stage_title\">第二次</div>
 			<div><div class=\"actual_label\">扣抵保留/租賃預收差款</div>".build_deduction_amount_input("second_retention_deduction_amount", "second_retention_deduction_source", $second_retention_deduction_amount, $second_retention_deduction_source)."</div>
 			<div><div class=\"actual_label\">扣抵預收款</div>".build_deduction_amount_input("second_advance_payment_deduction_amount", "second_advance_payment_deduction_source", $second_advance_payment_deduction_amount, $second_advance_payment_deduction_source)."</div>
 			<div><div class=\"actual_label\">其他扣抵款</div><input type=\"text\" class=\"form-control actual_field\" name=\"second_other_deduction_amount\" value=\"$second_other_deduction_amount\" onchange=\"moneyRoundIntInput(this);setEdit();\"></div>
+			<div><div class=\"actual_label\">其他加款(未稅)</div><input type=\"number\" step=\"1\" class=\"form-control actual_field\" name=\"second_other_addition_amount\" value=\"$second_other_addition_amount\" onchange=\"moneyRoundIntInput(this);setEdit();\"></div>
 		</div>
 	</div>
-	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 所有扣抵款均以案件原稅別輸入及保存；未勾選「手動」會在存檔時自動重算。</div>
+	<div class=\"actual_amount_hint\"><i class=\"bi bi-info-circle-fill\"></i> 所有扣抵款均以案件原稅別輸入及保存；未勾選「手動」會在存檔時自動重算。其他加款以未稅金額輸入，× 1.05 後計入實開發票及實際收款金額（含稅）。</div>
 ";
 
 $show_actual_collection_date_inputs = "
@@ -1975,6 +2005,7 @@ $tax_theme_css
 									<div><div class="field_label">第一次扣抵保留/租賃預收差款</div><div class="field_value">$show_retention_deduction_amount</div></div>
 									<div><div class="field_label">第一次扣抵預收款</div><div class="field_value">$show_advance_payment_deduction_amount</div></div>
 									<div><div class="field_label">第一次其他扣抵款</div><div class="field_value">$show_first_other_deduction_amount</div></div>
+									<div><div class="field_label">第一次其他加款(未稅)</div><div class="field_value">$show_first_other_addition_amount</div></div>
 								</div>
 							</div>
 							<div class="basic_overview_column">
@@ -1995,6 +2026,7 @@ $tax_theme_css
 									<div><div class="field_label">第二次扣抵保留/租賃預收差款</div><div class="field_value">$show_second_retention_deduction_amount</div></div>
 									<div><div class="field_label">第二次扣抵預收款</div><div class="field_value">$show_second_advance_payment_deduction_amount</div></div>
 									<div><div class="field_label">第二次其他扣抵款</div><div class="field_value">$show_second_other_deduction_amount</div></div>
+									<div><div class="field_label">第二次其他加款(未稅)</div><div class="field_value">$show_second_other_addition_amount</div></div>
 								</div>
 							</div>
 						</div>
@@ -2003,11 +2035,11 @@ $tax_theme_css
 							<div class="actual_grid actual_qty_grid">
 									<div>
 										<div class="actual_label">第一次實際計價數量</div>
-										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第一次實際放樣數量</div>
-										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第一次實際金額($actual_amount_tax_label)</div>
@@ -2015,11 +2047,11 @@ $tax_theme_css
 									</div>
 									<div>
 										<div class="actual_label">第二次實際計價數量</div>
-										<input type="number" class="form-control actual_field" name="second_actual_completed_qty" value="$second_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+										<input type="number" class="form-control actual_field" name="second_actual_completed_qty" value="$second_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第二次實際放樣數量</div>
-										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="0.01" onchange="setEdit();" />
+										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第二次實際金額($actual_amount_tax_label)</div>
