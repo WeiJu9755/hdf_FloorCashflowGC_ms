@@ -48,11 +48,11 @@ function processform($aFormValues){
 	$second_actual_billing_date_1		= trim($aFormValues['second_actual_billing_date_1']);
 	$second_actual_billing_date_2		= trim($aFormValues['second_actual_billing_date_2']);
 	$project_progress					= trim($aFormValues['project_progress']);
-	$first_actual_completed_qty			= normalize_money_for_sql($aFormValues['first_actual_completed_qty']);
-	$second_actual_completed_qty		= normalize_money_for_sql($aFormValues['second_actual_completed_qty']);
-	$first_layout_actual_completed_qty	= normalize_money_for_sql($aFormValues['first_layout_actual_completed_qty']);
-	$second_layout_actual_completed_qty	= normalize_money_for_sql($aFormValues['second_layout_actual_completed_qty']);
-	$completed_qty						= normalize_money_for_sql(floatval($first_actual_completed_qty) + floatval($second_actual_completed_qty));
+	$first_actual_completed_qty			= normalize_qty2_for_sql($aFormValues['first_actual_completed_qty']);
+	$second_actual_completed_qty		= normalize_qty2_for_sql($aFormValues['second_actual_completed_qty']);
+	$first_layout_actual_completed_qty	= normalize_qty2_for_sql($aFormValues['first_layout_actual_completed_qty']);
+	$second_layout_actual_completed_qty	= normalize_qty2_for_sql($aFormValues['second_layout_actual_completed_qty']);
+	$completed_qty						= normalize_qty2_for_sql(floatval($first_actual_completed_qty) + floatval($second_actual_completed_qty));
 	$first_actual_collection_date		= trim($aFormValues['first_actual_collection_date']);
 	$first_layout_actual_collection_date	= trim($aFormValues['first_layout_actual_collection_date']);
 	$second_actual_collection_date		= trim($aFormValues['second_actual_collection_date']);
@@ -241,6 +241,27 @@ function normalize_amount_for_sql($value) {
 
 function normalize_money_for_sql($value) {
 	$value = money_round_int($value);
+	if ($value === '' || !is_numeric($value)) {
+		return "0";
+	}
+	return $value;
+}
+
+// 數量四捨五入到小數第二位
+function qty_round2($value) {
+	$value = str_replace(',', '', trim((string)$value));
+	if ($value === '' || !is_numeric($value)) {
+		return $value;
+	}
+	$rounded = round((float)$value, 2);
+	if ($rounded == 0) {
+		$rounded = 0;
+	}
+	return number_format($rounded, 2, '.', '');
+}
+
+function normalize_qty2_for_sql($value) {
+	$value = qty_round2($value);
 	if ($value === '' || !is_numeric($value)) {
 		return "0";
 	}
@@ -737,11 +758,11 @@ if ($first_layout_actual_completed_qty == "" && $second_layout_actual_completed_
 	$first_layout_actual_completed_qty = $first_actual_completed_qty;
 	$second_layout_actual_completed_qty = $second_actual_completed_qty;
 }
-// 實際計價與放樣數量一律四捨五入到整數
-$first_actual_completed_qty = money_round_int($first_actual_completed_qty);
-$second_actual_completed_qty = money_round_int($second_actual_completed_qty);
-$first_layout_actual_completed_qty = money_round_int($first_layout_actual_completed_qty);
-$second_layout_actual_completed_qty = money_round_int($second_layout_actual_completed_qty);
+// 實際計價與放樣數量一律四捨五入到小數第二位
+$first_actual_completed_qty = qty_round2($first_actual_completed_qty);
+$second_actual_completed_qty = qty_round2($second_actual_completed_qty);
+$first_layout_actual_completed_qty = qty_round2($first_layout_actual_completed_qty);
+$second_layout_actual_completed_qty = qty_round2($second_layout_actual_completed_qty);
 
 if ($first_actual_completed_qty != "" || $second_actual_completed_qty != "") {
 	$preview_collection_result = calculate_actual_collection_amounts(
@@ -2035,11 +2056,11 @@ $tax_theme_css
 							<div class="actual_grid actual_qty_grid">
 									<div>
 										<div class="actual_label">第一次實際計價數量</div>
-										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
+										<input type="number" class="form-control actual_field" name="first_actual_completed_qty" value="$first_actual_completed_qty" min="0" step="0.01" onchange="qtyRound2Input(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第一次實際放樣數量</div>
-										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
+										<input type="number" class="form-control actual_field" name="first_layout_actual_completed_qty" value="$first_layout_actual_completed_qty" min="0" step="0.01" onchange="qtyRound2Input(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第一次實際金額($actual_amount_tax_label)</div>
@@ -2047,11 +2068,11 @@ $tax_theme_css
 									</div>
 									<div>
 										<div class="actual_label">第二次實際計價數量</div>
-										<input type="number" class="form-control actual_field" name="second_actual_completed_qty" value="$second_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
+										<input type="number" class="form-control actual_field" name="second_actual_completed_qty" value="$second_actual_completed_qty" min="0" step="0.01" onchange="qtyRound2Input(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第二次實際放樣數量</div>
-										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="1" onchange="moneyRoundIntInput(this);setEdit();" />
+										<input type="number" class="form-control actual_field" name="second_layout_actual_completed_qty" value="$second_layout_actual_completed_qty" min="0" step="0.01" onchange="qtyRound2Input(this);setEdit();" />
 									</div>
 									<div>
 										<div class="actual_label">第二次實際金額($actual_amount_tax_label)</div>
@@ -2280,6 +2301,20 @@ function moneyRoundInt(value) {
 	var num = Number(text);
 	var rounded = (num < 0 ? -1 : 1) * Math.round(Math.abs(num));
 	return String(rounded === 0 ? 0 : rounded);
+}
+
+// 數量四捨五入到小數第二位
+function qtyRound2Input(el) {
+	if (!el) {
+		return;
+	}
+	var text = String(el.value).replace(/,/g, '').trim();
+	if (text === '' || isNaN(text)) {
+		return;
+	}
+	var num = Number(text);
+	var rounded = (num < 0 ? -1 : 1) * Math.round((Math.abs(num) + Number.EPSILON) * 100) / 100;
+	el.value = (rounded === 0 ? 0 : rounded).toFixed(2);
 }
 
 function moneyRoundIntInput(el) {
